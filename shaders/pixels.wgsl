@@ -27,13 +27,16 @@ fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
     let pos = in.uv * vec2f(ctx.image_size) - vec2(0.5);
     let rounded = round(pos);
 
-    let vec = pos - rounded;
-    let dist = max(abs(vec.x), abs(vec.y));
+    let dist = chebyshev_distance(pos - rounded);
+    let edge = dist > (ctx.cutoff * saturate(in.uv.x * 20.0 + ctx.progress));
+    // ↑ todo: make image size independent
 
-    let px = vec2u(rounded);
-    let idx = px.y * ctx.image_size.x + px.x;
-    let pixel = (image[idx / 32] & (1u << (idx % 32))) != 0 || dist > (ctx.cutoff * saturate(in.uv.x * 20.0 + ctx.progress));
+    let idx = u32(rounded.y) * ctx.image_size.x + u32(rounded.x);
+    let pixel = (image[idx / 32] & (1u << (idx % 32))) != 0;
 
-    let color = mix(vec3(.110, .620, .455), vec3(.325, .800, .631), f32(pixel));
-    return vec4(color, 1.0);
+    return vec4(vec3(0.0), f32(!(pixel || edge)) * 0.25);
+}
+
+fn chebyshev_distance(vec: vec2f) -> f32 {
+    return max(abs(vec.x), abs(vec.y));
 }

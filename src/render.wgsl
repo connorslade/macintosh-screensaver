@@ -4,7 +4,9 @@
 struct Uniform {
     view: mat4x4f,
     image_size: vec2u,
-    window_size: vec2u
+    window_size: vec2u,
+    cutoff: f32,
+    progress: f32
 }
 
 struct VertexOutput {
@@ -22,9 +24,15 @@ fn vert(
 
 @fragment
 fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
-    let px = vec2u(in.uv * vec2f(ctx.image_size));
+    let pos = in.uv * vec2f(ctx.image_size) - vec2(0.5);
+    let rounded = round(pos);
+
+    let vec = pos - rounded;
+    let dist = max(abs(vec.x), abs(vec.y));
+
+    let px = vec2u(rounded);
     let idx = px.y * ctx.image_size.x + px.x;
-    let pixel = (image[idx / 32] & (1u << (idx % 32))) != 0;
+    let pixel = (image[idx / 32] & (1u << (idx % 32))) != 0 || dist > (ctx.cutoff * saturate(in.uv.x * 20.0 + ctx.progress));
 
     let color = mix(vec3(.110, .620, .455), vec3(.325, .800, .631), f32(pixel));
     return vec4(color, 1.0);

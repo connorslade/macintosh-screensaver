@@ -8,20 +8,23 @@ use encase::ShaderType;
 use tufa::{
     bindings::buffer::{UniformBuffer, mutability::Immutable},
     export::{
+        egui::{Context, Window},
         nalgebra::{Matrix4, Vector2, Vector3},
         wgpu::{CompareFunction, RenderPass, ShaderStages, include_wgsl},
         winit::window::WindowAttributes,
     },
     gpu::Gpu,
-    interactive::{GraphicsCtx, Interactive},
+    interactive::{
+        GraphicsCtx, Interactive,
+        ui::{dragger, vec3_dragger},
+    },
     pipeline::render::RenderPipeline,
     prelude::StorageBuffer,
 };
 
-use crate::animation::Animation;
+use crate::animation::{Animation, properties::Properties};
 
 mod animation;
-mod colormap;
 mod interpolate;
 
 #[derive(ShaderType, Default)]
@@ -51,6 +54,7 @@ struct App {
 
     start: Instant,
     animation: Animation,
+    manual_properties: Properties,
 }
 
 impl Interactive for App {
@@ -69,6 +73,8 @@ impl Interactive for App {
         });
 
         let (properties, image) = self.animation.scene(time);
+        // println!("{properties:?}");
+        // let properties = &self.manual_properties;
 
         self.image.upload(&image.data);
         self.pixel_uniform.upload(&PixelUniform {
@@ -83,6 +89,27 @@ impl Interactive for App {
 
         self.background.draw_quad(render_pass, 0..1);
         self.pixels.draw_quad(render_pass, 0..1);
+    }
+
+    fn ui(&mut self, _gcx: GraphicsCtx, ctx: &Context) {
+        Window::new("Macintosh Dynamic Wallpaper").show(ctx, |ui| {
+            let props = &mut self.manual_properties;
+            ui.horizontal(|ui| {
+                vec3_dragger(ui, &mut props.camera_pos, |x| x.speed(0.01));
+                ui.label("Camera Position");
+            });
+
+            ui.horizontal(|ui| {
+                vec3_dragger(ui, &mut props.camera_dir, |x| x.speed(0.01));
+                ui.label("Camera Direction");
+            });
+
+            dragger(ui, "Scale", &mut props.scale, |x| x.speed(0.01));
+            dragger(ui, "Progress Anlge", &mut props.progress_angle, |x| {
+                x.speed(0.01)
+            });
+            dragger(ui, "Progress", &mut props.progress, |x| x.speed(0.01));
+        });
     }
 }
 
@@ -116,6 +143,7 @@ fn main() -> Result<()> {
             background,
 
             start: Instant::now(),
+            manual_properties: animation.config.scenes.properties.clone(),
             animation,
         },
     )

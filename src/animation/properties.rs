@@ -5,11 +5,11 @@ use crate::interpolate::Interpolate;
 
 #[derive(Deserialize, Debug, Default)]
 pub struct OptionalProperties {
-    camera_pos: Option<Vector3<f32>>,
-    camera_dir: Option<Vector3<f32>>,
-    scale: Option<f32>,
-    progress: Option<f32>,
-    progress_angle: Option<f32>,
+    pub camera_pos: Option<Vector3<f32>>,
+    pub camera_dir: Option<Vector3<f32>>,
+    pub scale: Option<f32>,
+    pub progress: Option<f32>,
+    pub progress_angle: Option<f32>,
 }
 
 #[derive(Deserialize, Debug, Clone)]

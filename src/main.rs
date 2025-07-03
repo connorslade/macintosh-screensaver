@@ -8,21 +8,17 @@ use encase::ShaderType;
 use tufa::{
     bindings::buffer::{UniformBuffer, mutability::Immutable},
     export::{
-        egui::{Context, Window},
         nalgebra::{Matrix4, Vector2, Vector3},
         wgpu::{CompareFunction, RenderPass, ShaderStages, include_wgsl},
         winit::window::WindowAttributes,
     },
     gpu::Gpu,
-    interactive::{
-        GraphicsCtx, Interactive,
-        ui::{dragger, vec3_dragger},
-    },
+    interactive::{GraphicsCtx, Interactive},
     pipeline::render::RenderPipeline,
     prelude::StorageBuffer,
 };
 
-use crate::animation::{Animation, properties::Properties};
+use crate::animation::Animation;
 
 mod animation;
 mod interpolate;
@@ -54,6 +50,8 @@ struct App {
 
     start: Instant,
     animation: Animation,
+
+    #[cfg(feature = "manual")]
     manual_properties: Properties,
 }
 
@@ -72,9 +70,11 @@ impl Interactive for App {
             end: colormap.get_background_bottom(t),
         });
 
+        #[cfg(not(feature = "manual"))]
         let (properties, image) = self.animation.scene(time);
-        // println!("{properties:?}");
-        // let properties = &self.manual_properties;
+
+        #[cfg(feature = "manual")]
+        let (properties, image) = (&self.manual_properties, self.animation.image(0));
 
         self.image.upload(&image.data);
         self.pixel_uniform.upload(&PixelUniform {
@@ -91,7 +91,14 @@ impl Interactive for App {
         self.pixels.draw_quad(render_pass, 0..1);
     }
 
+    #[cfg(feature = "manual")]
     fn ui(&mut self, _gcx: GraphicsCtx, ctx: &Context) {
+        use crate::animation::properties::Properties;
+        use tufa::{
+            export::egui::{Context, Window},
+            interactive::ui::{dragger, vec3_dragger},
+        };
+
         Window::new("Macintosh Dynamic Wallpaper").show(ctx, |ui| {
             let props = &mut self.manual_properties;
             ui.horizontal(|ui| {
@@ -143,8 +150,10 @@ fn main() -> Result<()> {
             background,
 
             start: Instant::now(),
-            manual_properties: animation.config.scenes.properties.clone(),
             animation,
+
+            #[cfg(feature = "manual")]
+            manual_properties: animation.config.scenes.properties.clone(),
         },
     )
     .run()?;

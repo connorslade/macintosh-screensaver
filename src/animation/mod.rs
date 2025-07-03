@@ -6,14 +6,14 @@ use image::{GenericImageView, ImageReader};
 use nalgebra::Vector2;
 
 use crate::animation::{
-    colormap::Colormap,
-    config::AnimationConfig,
-    properties::{OptionalProperties, Properties},
+    colormap::Colormap, config::AnimationConfig, properties::Properties,
+    timeline::PropertiesTimeline,
 };
 
 pub mod colormap;
 pub mod config;
 pub mod properties;
+pub mod timeline;
 
 pub struct Animation {
     pub config: AnimationConfig,
@@ -32,6 +32,11 @@ pub struct Timer {
 }
 
 pub struct SceneData {
+    pub image: Image,
+    pub timeline: PropertiesTimeline,
+}
+
+pub struct Image {
     pub data: Vec<u32>,
     pub size: Vector2<u32>,
 }
@@ -64,8 +69,11 @@ impl Animation {
             }
 
             scenes.push(SceneData {
-                data: buffer.into_vec(),
-                size: Vector2::new(image.width(), image.height()),
+                image: Image {
+                    data: buffer.into_vec(),
+                    size: Vector2::new(image.width(), image.height()),
+                },
+                timeline: PropertiesTimeline::new(&scene.keyframes),
             });
         }
 
@@ -79,26 +87,31 @@ impl Animation {
         })
     }
 
-    pub fn scene(&mut self, t: f32) -> (Properties, &SceneData) {
-        let t = t - self.scene_timer.offset;
+    pub fn scene(&mut self, time: f32) -> (Properties, &Image) {
+        let t = time - self.scene_timer.offset;
 
-        let image = &self.scenes[self.scene_timer.index];
+        let scene_config = &self.config.scenes.scene[self.scene_timer.index];
+        let scene_data = &self.scenes[self.scene_timer.index];
         let default = &self.config.scenes.properties;
 
-        let scene = &self.config.scenes.scene[self.scene_timer.index];
-        if t > scene.duration {
-            self.scene_timer.offset = t;
+        if t > scene_config.duration {
+            self.scene_timer.offset = time;
             self.scene_timer.index = (self.scene_timer.index + 1) % self.scenes.len();
             self.keyframe = 0;
         }
 
-        let camera_pos = scene.camera_keyframes.get(t);
-        let progress = scene.progress_keyframes.get(t);
-
-        let properties = OptionalProperties::camera_pos(camera_pos)
-            .combine(&OptionalProperties::progress(progress))
-            .combine(&scene.properties)
+        let animated = scene_data.timeline.get(t);
+        let properties = animated
+            .combine(&scene_config.properties)
             .with_defaults(&default);
-        (properties, &image)
+        (properties, &scene_data.image)
+    }
+
+    pub fn scenes(&self) -> usize {
+        self.scenes.len()
+    }
+
+    pub fn image(&self, n: usize) -> &Image {
+        &self.scenes[n].image
     }
 }

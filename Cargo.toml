@@ -12,3 +12,7 @@ serde = { version = "1.0.219", features = ["derive"] }
 toml = "0.8.23"
 tufa = { path = "../tufa" }
 nalgebra = { version = "0.33.2" ,features = ["serde-serialize"] }
+ordered-float = "5.0.0"
+
+[features]
+manual = []

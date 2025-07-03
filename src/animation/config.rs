@@ -1,12 +1,8 @@
 use std::path::PathBuf;
 
-use nalgebra::Vector3;
 use serde::Deserialize;
 
-use crate::{
-    animation::properties::{OptionalProperties, Properties},
-    interpolate::Interpolate,
-};
+use crate::animation::properties::{OptionalProperties, Properties};
 
 #[derive(Deserialize, Debug)]
 pub struct AnimationConfig {
@@ -34,34 +30,12 @@ pub struct SceneConfig {
 
     #[serde(flatten)]
     pub properties: OptionalProperties,
-    pub camera_keyframes: Timeline<Vector3<f32>>,
-    pub progress_keyframes: Timeline<f32>,
+    pub keyframes: Vec<PropertyKeyframe>,
 }
 
 #[derive(Deserialize, Debug)]
-#[serde(transparent)]
-pub struct Timeline<T> {
-    pub keyframes: Vec<Keyframe<T>>,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct Keyframe<T> {
+pub struct PropertyKeyframe {
     pub t: f32,
-    pub value: T,
-}
-
-impl<T: Interpolate> Timeline<T> {
-    pub fn get(&self, t: f32) -> T {
-        // todo: sort once by t
-        for i in 0..self.keyframes.len() {
-            let keyframe = &self.keyframes[i];
-            if t < keyframe.t {
-                let last = &self.keyframes[i - 1];
-                let frac = (t - last.t) / (keyframe.t - last.t);
-                return last.value.interpolate(&keyframe.value, frac);
-            }
-        }
-
-        panic!()
-    }
+    #[serde(flatten)]
+    pub properties: OptionalProperties,
 }

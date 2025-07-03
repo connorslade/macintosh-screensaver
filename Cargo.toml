@@ -8,4 +8,7 @@ anyhow = "1.0.98"
 bitvec = "1.0.1"
 encase = { version = "0.10.0", features = ["nalgebra"] }
 image = "0.25.6"
+serde = { version = "1.0.219", features = ["derive"] }
+toml = "0.8.23"
 tufa = { path = "../tufa" }
+nalgebra = { version = "0.33.2" ,features = ["serde-serialize"] }

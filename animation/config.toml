@@ -1,0 +1,21 @@
+[background]
+colormap = "color.png"
+duration = 60.0
+
+[scenes]
+camera_pos = [ -1.63, 0.22, -1.30 ]
+camera_dir = [ -0.40, 0.93, 1.11 ]
+
+scale = 4.0
+cutoff = 0.43
+
+progress = 0.0
+progress_angle = 0.0
+
+[[scenes.scene]]
+image = "image.png"
+duration = 15.0
+keyframes = [
+    { t = 0.0 },
+    { t = 15.0, camera_pos = [ 0.0, 0.0, -1.3 ] }
+]

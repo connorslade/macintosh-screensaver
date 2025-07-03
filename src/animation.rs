@@ -5,18 +5,27 @@ use std::{
 
 use anyhow::{Context, Result};
 use bitvec::{order::Lsb0, vec::BitVec};
-use image::{GenericImageView, ImageFormat, ImageReader};
-use nalgebra::Matrix4;
+use image::{GenericImageView, ImageReader};
+use nalgebra::{Matrix4, Vector2};
 use serde::Deserialize;
 use tufa::export::nalgebra::Vector3;
 
-use crate::colormap::Colormap;
+use crate::{colormap::Colormap, interpolate::Interpolate};
 
 pub struct Animation {
     pub config: AnimationConfig,
 
     pub colormap: Colormap,
     pub scenes: Vec<SceneData>,
+
+    pub scene_timer: Timer,
+    pub keyframe: usize,
+}
+
+#[derive(Default)]
+pub struct Timer {
+    index: usize,
+    offset: f32,
 }
 
 #[derive(Deserialize, Debug)]
@@ -71,8 +80,9 @@ pub struct Properties {
     pub progress_angle: f32,
 }
 
-struct SceneData {
-    data: BitVec<u32>,
+pub struct SceneData {
+    pub data: Vec<u32>,
+    pub size: Vector2<u32>,
 }
 
 impl Animation {
@@ -102,23 +112,54 @@ impl Animation {
                 }
             }
 
-            scenes.push(buffer);
+            scenes.push(SceneData {
+                data: buffer.into_vec(),
+                size: Vector2::new(image.width(), image.height()),
+            });
         }
 
         Ok(Self {
             config,
             colormap,
-            scenes: vec![],
+            scenes,
+
+            scene_timer: Timer::default(),
+            keyframe: 0,
         })
     }
 
-    pub fn properties(&self, _t: f32) -> &Properties {
-        &self.config.scenes.properties
+    pub fn scene(&mut self, t: f32) -> (Properties, &SceneData) {
+        let t = t - self.scene_timer.offset;
+
+        let image = &self.scenes[self.scene_timer.index];
+        let default = &self.config.scenes.properties;
+
+        let scene = &self.config.scenes.scene[self.scene_timer.index];
+        if t > scene.duration {
+            self.scene_timer.offset = t;
+            self.scene_timer.index = (self.scene_timer.index + 1) % self.scenes.len();
+            self.keyframe = 0;
+        }
+
+        let keyframe = &scene.keyframes[self.keyframe];
+        let next = &scene.keyframes[self.keyframe + 1];
+
+        if t >= next.t {
+            self.keyframe += 1;
+        }
+
+        let frac = (t - keyframe.t) / (next.t - keyframe.t);
+        let properties = keyframe
+            .properties
+            .with_defaults(default)
+            .interpolate(&next.properties.with_defaults(default), frac);
+
+        (properties, &image)
     }
 }
 
 impl OptionalProperties {
-    pub fn with_defaults(self, defaults: &Properties) -> Properties {
+    pub fn with_defaults(&self, defaults: &Properties) -> Properties {
         Properties {
             camera_pos: self.camera_pos.unwrap_or(defaults.camera_pos),
             camera_dir: self.camera_dir.unwrap_or(defaults.camera_dir),
@@ -130,6 +171,16 @@ impl OptionalProperties {
 }
 
 impl Properties {
+    pub fn interpolate(&self, other: &Self, t: f32) -> Self {
+        Properties {
+            camera_pos: self.camera_pos.lerp(&other.camera_pos, t),
+            camera_dir: self.camera_dir.lerp(&other.camera_dir, t),
+            scale: self.scale.interpolate(&other.scale, t),
+            progress: self.progress.interpolate(&other.progress, t),
+            progress_angle: self.progress_angle.interpolate(&other.progress_angle, t),
+        }
+    }
+
     pub fn view_projection(&self, aspect: f32) -> Matrix4<f32> {
         let depth = 100.0;
         let projection = if aspect < 1.0 {

@@ -1,3 +1,6 @@
+// ↓ Needed due to a rust-analyzer bug
+#![allow(dead_code)]
+
 use std::time::Instant;
 
 use anyhow::Result;
@@ -12,12 +15,14 @@ use tufa::{
     gpu::Gpu,
     interactive::{GraphicsCtx, Interactive},
     pipeline::render::RenderPipeline,
+    prelude::StorageBuffer,
 };
 
 use crate::animation::Animation;
 
 mod animation;
 mod colormap;
+mod interpolate;
 
 #[derive(ShaderType, Default)]
 struct PixelUniform {
@@ -39,6 +44,7 @@ struct BackgroundUniform {
 struct App {
     pixel_uniform: UniformBuffer<PixelUniform>,
     pixels: RenderPipeline,
+    image: StorageBuffer<Vec<u32>, Immutable>,
 
     background_uniform: UniformBuffer<BackgroundUniform>,
     background: RenderPipeline,
@@ -54,19 +60,22 @@ impl Interactive for App {
 
         let time = self.start.elapsed().as_secs_f32();
         let t = (time / 60.0) % 1.0;
-        let properties = self.animation.properties(time);
 
         let colormap = &self.animation.colormap;
+        let foreground = colormap.get_foreground(t);
         self.background_uniform.upload(&BackgroundUniform {
             start: colormap.get_background_top(t),
             end: colormap.get_background_bottom(t),
         });
 
+        let (properties, image) = self.animation.scene(time);
+
+        self.image.upload(&image.data);
         self.pixel_uniform.upload(&PixelUniform {
             view: properties.view_projection(aspect),
-            image_size: Vector2::zeros(),
+            image_size: image.size,
             window_size: Vector2::new(window.width, window.height),
-            color: colormap.get_foreground(t),
+            color: foreground,
             cutoff: 0.43,
             progress: properties.progress,
             progress_angle: properties.progress_angle,
@@ -82,14 +91,14 @@ fn main() -> Result<()> {
 
     let gpu = Gpu::new()?;
 
-    let buffer = gpu.create_storage_empty::<Vec<u32>, Immutable>((512_u64 * 342).div_ceil(8));
+    let image = gpu.create_storage_empty::<Vec<u32>, Immutable>((512_u64 * 342).div_ceil(32));
     let pixel_uniform = gpu.create_uniform(&PixelUniform::default());
     let background_uniform = gpu.create_uniform(&BackgroundUniform::default());
     let pixels = gpu
         .render_pipeline(include_wgsl!("../shaders/pixels.wgsl"))
         .depth_compare(CompareFunction::Always)
         .bind(&pixel_uniform, ShaderStages::VERTEX_FRAGMENT)
-        .bind(&buffer, ShaderStages::FRAGMENT)
+        .bind(&image, ShaderStages::FRAGMENT)
         .finish();
     let background = gpu
         .render_pipeline(include_wgsl!("../shaders/background.wgsl"))
@@ -101,6 +110,7 @@ fn main() -> Result<()> {
         App {
             pixel_uniform,
             pixels,
+            image,
 
             background_uniform,
             background,

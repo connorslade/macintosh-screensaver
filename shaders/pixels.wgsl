@@ -5,6 +5,8 @@ struct Uniform {
     view: mat4x4f,
     image_size: vec2u,
     window_size: vec2u,
+
+    color: vec3f,
     cutoff: f32,
     progress: f32
 }
@@ -34,7 +36,7 @@ fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
     let idx = u32(rounded.y) * ctx.image_size.x + u32(rounded.x);
     let pixel = (image[idx / 32] & (1u << (idx % 32))) != 0;
 
-    return vec4(vec3(0.0), (1.0 - (f32(pixel) + saturate(edge * 30.0))) * 0.25);
+    return vec4(ctx.color, 1.0) * (1.0 - (f32(pixel) + saturate(edge * 30.0)));
 }
 
 fn chebyshev_distance(vec: vec2f) -> f32 {

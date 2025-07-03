@@ -1,7 +1,9 @@
+use std::time::Instant;
+
 use anyhow::Result;
 use bitvec::{order::Lsb0, vec::BitVec};
 use encase::ShaderType;
-use image::GenericImageView;
+use image::{DynamicImage, GenericImageView, Rgba};
 use tufa::{
     bindings::buffer::{UniformBuffer, mutability::Immutable},
     export::{
@@ -18,11 +20,16 @@ use tufa::{
     pipeline::render::RenderPipeline,
 };
 
+use crate::colormap::Colormap;
+
+mod colormap;
+
 #[derive(ShaderType, Default)]
 struct PixelUniform {
     view: Matrix4<f32>,
     image_size: Vector2<u32>,
     window_size: Vector2<u32>,
+    color: Vector3<f32>,
     cutoff: f32,
     progress: f32,
 }
@@ -35,9 +42,13 @@ struct BackgroundUniform {
 
 struct App {
     pixel_uniform: UniformBuffer<PixelUniform>,
-    background: RenderPipeline,
     pixels: RenderPipeline,
 
+    background_uniform: UniformBuffer<BackgroundUniform>,
+    background: RenderPipeline,
+
+    start: Instant,
+    colormap: Colormap,
     ctx: PixelUniform,
 
     camera_pos: Vector3<f32>,
@@ -71,8 +82,15 @@ impl Interactive for App {
         self.ctx.cutoff = self.cutoff;
         self.ctx.progress = self.progress;
 
-        self.pixel_uniform.upload(&self.ctx);
+        let t = (self.start.elapsed().as_secs_f32() / 60.0) % 1.0;
+        self.ctx.color = self.colormap.get_foreground(t);
+        self.background_uniform.upload(&BackgroundUniform {
+            start: self.colormap.get_background_top(t),
+            end: self.colormap.get_background_bottom(t),
+        });
+
         self.background.draw_quad(render_pass, 0..1);
+        self.pixel_uniform.upload(&self.ctx);
         self.pixels.draw_quad(render_pass, 0..1);
     }
 
@@ -98,8 +116,11 @@ impl Interactive for App {
 fn main() -> Result<()> {
     let gpu = Gpu::new()?;
 
-    let image = image::load_from_memory(include_bytes!("../image-2.png"))?;
+    let image = image::load_from_memory(include_bytes!("../animation/image-2.png"))?;
     let mut buffer = BitVec::<u32, Lsb0>::new();
+
+    let colormap = image::load_from_memory(include_bytes!("../animation/color.png"))?;
+    let colormap = Colormap::new(colormap);
 
     for y in 0..image.height() {
         for x in 0..image.width() {
@@ -129,9 +150,13 @@ fn main() -> Result<()> {
         WindowAttributes::default().with_title("Macintosh Dynamic Wallpaper"),
         App {
             pixel_uniform,
-            background,
             pixels,
 
+            background_uniform,
+            background,
+
+            start: Instant::now(),
+            colormap,
             ctx: PixelUniform {
                 image_size: Vector2::new(image.width(), image.height()),
                 ..PixelUniform::default()

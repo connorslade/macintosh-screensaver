@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use anyhow::Result;
 use bitvec::{order::Lsb0, vec::BitVec};
 use encase::ShaderType;
@@ -47,28 +45,12 @@ struct App {
     scale: f32,
     cutoff: f32,
     progress: f32,
-
-    alpha: f32,
-    beta: f32,
-
-    start: Instant,
 }
 
 impl Interactive for App {
     fn render(&mut self, gcx: GraphicsCtx, render_pass: &mut RenderPass) {
         let window = gcx.window.inner_size();
         let aspect = window.width as f32 / window.height as f32;
-
-        // let t = self.start.elapsed().as_secs_f32() / 10.0;
-
-        // self.progress = (-19.87) * (1.0 - t) + -6.0 * t;
-        // self.camera_pos = Vector3::new(4.96, 3.5, -0.67).lerp(&Vector3::new(2.37, 3.92, -0.67), t);
-
-        self.camera_target = Vector3::new(
-            self.alpha.sin() * self.beta.cos(),
-            self.alpha.sin() * self.beta.sin(),
-            self.beta.cos(),
-        );
 
         let depth = 100.0;
         let projection = if aspect < 1.0 {
@@ -109,8 +91,6 @@ impl Interactive for App {
             dragger(ui, "Scale", &mut self.scale, |x| x.speed(0.01));
             dragger(ui, "Cutoff", &mut self.cutoff, |x| x.speed(0.01));
             dragger(ui, "Progress", &mut self.progress, |x| x.speed(0.01));
-            dragger(ui, "α", &mut self.alpha, |x| x.speed(0.01));
-            dragger(ui, "β", &mut self.beta, |x| x.speed(0.01));
         });
     }
 }
@@ -157,16 +137,11 @@ fn main() -> Result<()> {
                 ..PixelUniform::default()
             },
 
-            camera_pos: Vector3::new(-4.31, -1.12, -0.67),
-            camera_target: Vector3::new(-0.48, 1.0, 1.0),
-            scale: 6.0,
-            cutoff: 0.45,
+            camera_pos: Vector3::new(-1.63, 0.22, -1.30),
+            camera_target: Vector3::new(-0.40, 0.93, 1.11),
+            scale: 4.0,
+            cutoff: 0.43,
             progress: 0.0,
-
-            start: Instant::now(),
-
-            alpha: 0.0,
-            beta: 0.0,
         },
     )
     .run()?;

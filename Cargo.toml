@@ -8,5 +8,4 @@ anyhow = "1.0.98"
 bitvec = "1.0.1"
 encase = { version = "0.10.0", features = ["nalgebra"] }
 image = "0.25.6"
-# tufa = "0.1.2"
 tufa = { path = "../tufa" }

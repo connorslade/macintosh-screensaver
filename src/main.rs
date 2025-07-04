@@ -17,8 +17,15 @@ use tufa::{
     pipeline::render::RenderPipeline,
     prelude::StorageBuffer,
 };
+#[cfg(feature = "manual")]
+use tufa::{
+    export::egui::{Context, Slider, Window},
+    interactive::ui::{dragger, vec3_dragger},
+};
 
 use crate::animation::Animation;
+#[cfg(feature = "manual")]
+use crate::animation::properties::Properties;
 
 mod animation;
 mod interpolate;
@@ -52,7 +59,7 @@ struct App {
     animation: Animation,
 
     #[cfg(feature = "manual")]
-    manual_properties: Properties,
+    manual_properties: (Properties, usize),
 }
 
 impl Interactive for App {
@@ -74,7 +81,10 @@ impl Interactive for App {
         let (properties, image) = self.animation.scene(time);
 
         #[cfg(feature = "manual")]
-        let (properties, image) = (&self.manual_properties, self.animation.image(0));
+        let (properties, image) = (
+            &self.manual_properties.0,
+            self.animation.image(self.manual_properties.1),
+        );
 
         self.image.upload(&image.data);
         self.pixel_uniform.upload(&PixelUniform {
@@ -93,14 +103,17 @@ impl Interactive for App {
 
     #[cfg(feature = "manual")]
     fn ui(&mut self, _gcx: GraphicsCtx, ctx: &Context) {
-        use crate::animation::properties::Properties;
-        use tufa::{
-            export::egui::{Context, Window},
-            interactive::ui::{dragger, vec3_dragger},
-        };
-
         Window::new("Macintosh Dynamic Wallpaper").show(ctx, |ui| {
-            let props = &mut self.manual_properties;
+            let props = &mut self.manual_properties.0;
+
+            ui.horizontal(|ui| {
+                ui.add(Slider::new(
+                    &mut self.manual_properties.1,
+                    0..=(self.animation.scenes() - 1),
+                ));
+                ui.label("Image");
+            });
+
             ui.horizontal(|ui| {
                 vec3_dragger(ui, &mut props.camera_pos, |x| x.speed(0.01));
                 ui.label("Camera Position");
@@ -149,11 +162,11 @@ fn main() -> Result<()> {
             background_uniform,
             background,
 
+            #[cfg(feature = "manual")]
+            manual_properties: (animation.config.scenes.properties.clone(), 0),
+
             start: Instant::now(),
             animation,
-
-            #[cfg(feature = "manual")]
-            manual_properties: animation.config.scenes.properties.clone(),
         },
     )
     .run()?;

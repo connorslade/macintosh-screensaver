@@ -25,7 +25,9 @@ pub struct ScenesConfig {
 
 #[derive(Deserialize, Debug)]
 pub struct SceneConfig {
-    pub image: PathBuf,
+    pub frames: Vec<PathBuf>,
+    #[serde(default = "default_frametime")]
+    pub frametime: f32,
     pub duration: f32,
 
     #[serde(flatten)]
@@ -38,4 +40,8 @@ pub struct PropertyKeyframe {
     pub t: f32,
     #[serde(flatten)]
     pub properties: OptionalProperties,
+}
+
+fn default_frametime() -> f32 {
+    1.0
 }

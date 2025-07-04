@@ -22,6 +22,7 @@ pub struct Animation {
     pub scenes: Vec<SceneData>,
 
     pub scene_timer: Timer,
+    pub frame_timer: Timer,
     pub keyframe: usize,
 }
 
@@ -32,7 +33,7 @@ pub struct Timer {
 }
 
 pub struct SceneData {
-    pub image: Image,
+    pub frames: Vec<Image>,
     pub timeline: PropertiesTimeline,
 }
 
@@ -56,23 +57,28 @@ impl Animation {
 
         let mut scenes = Vec::with_capacity(config.scenes.scene.len());
         for scene in config.scenes.scene.iter() {
-            let image = ImageReader::open(dir.join(&scene.image))?
-                .with_guessed_format()?
-                .decode()?;
+            let mut frames = Vec::new();
+            for frame in scene.frames.iter() {
+                let image = ImageReader::open(dir.join(&frame))?
+                    .with_guessed_format()?
+                    .decode()?;
 
-            let mut buffer = BitVec::<u32, Lsb0>::new();
-            for y in 0..image.height() {
-                for x in 0..image.width() {
-                    let pixel = image.get_pixel(x, y).0[0] != 0;
-                    buffer.push(pixel);
+                let mut buffer = BitVec::<u32, Lsb0>::new();
+                for y in 0..image.height() {
+                    for x in 0..image.width() {
+                        let pixel = image.get_pixel(x, y).0[0] != 0;
+                        buffer.push(pixel);
+                    }
                 }
+
+                frames.push(Image {
+                    data: buffer.into_vec(),
+                    size: Vector2::new(image.width(), image.height()),
+                });
             }
 
             scenes.push(SceneData {
-                image: Image {
-                    data: buffer.into_vec(),
-                    size: Vector2::new(image.width(), image.height()),
-                },
+                frames,
                 timeline: PropertiesTimeline::new(&scene.keyframes),
             });
         }
@@ -83,6 +89,7 @@ impl Animation {
             scenes,
 
             scene_timer: Timer::default(),
+            frame_timer: Timer::default(),
             keyframe: 0,
         })
     }
@@ -97,14 +104,19 @@ impl Animation {
         if t > scene_config.duration {
             self.scene_timer.offset = time;
             self.scene_timer.index = (self.scene_timer.index + 1) % self.scenes.len();
+            self.frame_timer.index = 0;
+            self.frame_timer.offset = 0.0;
             self.keyframe = 0;
         }
+
+        let frame = ((t / scene_config.frametime) as usize).min(scene_data.frames.len() - 1);
+        let frame = &scene_data.frames[frame];
 
         let animated = scene_data.timeline.get(t);
         let properties = animated
             .combine(&scene_config.properties)
             .with_defaults(&default);
-        (properties, &scene_data.image)
+        (properties, &frame)
     }
 
     pub fn scenes(&self) -> usize {
@@ -112,6 +124,6 @@ impl Animation {
     }
 
     pub fn image(&self, n: usize) -> &Image {
-        &self.scenes[n].image
+        &self.scenes[n].frames[0]
     }
 }

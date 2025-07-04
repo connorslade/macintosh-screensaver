@@ -24,6 +24,7 @@ pub struct PropertiesTimeline {
     camera_pos: Timeline<Vector3<f32>>,
     camera_dir: Timeline<Vector3<f32>>,
     scale: Timeline<f32>,
+    frame: Timeline<usize>,
     progress: Timeline<f32>,
     progress_angle: Timeline<f32>,
 }
@@ -74,6 +75,10 @@ impl PropertiesTimeline {
                 timeline.scale.keyframes.push(Keyframe { t, value });
             }
 
+            if let Some(value) = keyframe.properties.frame {
+                timeline.frame.keyframes.push(Keyframe { t, value });
+            }
+
             if let Some(value) = keyframe.properties.progress {
                 timeline.progress.keyframes.push(Keyframe { t, value });
             }
@@ -89,6 +94,7 @@ impl PropertiesTimeline {
         timeline.camera_dir.sort();
         timeline.camera_pos.sort();
         timeline.scale.sort();
+        timeline.frame.sort();
         timeline.progress.sort();
         timeline.progress_angle.sort();
 
@@ -100,6 +106,7 @@ impl PropertiesTimeline {
             camera_pos: self.camera_pos.get(t),
             camera_dir: self.camera_dir.get(t),
             scale: self.scale.get(t),
+            frame: self.frame.get(t),
             progress: self.progress.get(t),
             progress_angle: self.progress_angle.get(t),
         }

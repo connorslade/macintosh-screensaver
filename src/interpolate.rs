@@ -10,6 +10,12 @@ impl Interpolate for f32 {
     }
 }
 
+impl Interpolate for usize {
+    fn interpolate(&self, other: &Self, t: f32) -> Self {
+        (*self as f32).interpolate(&(*other as f32), t).round() as usize
+    }
+}
+
 impl Interpolate for Vector3<f32> {
     fn interpolate(&self, other: &Self, t: f32) -> Self {
         self.lerp(other, t)

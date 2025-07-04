@@ -9,14 +9,19 @@ camera_dir = [ -0.40, 1.26, 1.06 ]
 scale = 4.0
 cutoff = 0.43
 
+frame = 0
 progress = 0.0
 progress_angle = 0.0
 
+# progress speed ⇒ 30/5s
+# movement speed ⇒ 3.35/15s
+
+# todo: slow movements down? (.1/s)
+
 [[scenes.scene]]
-frames = [ "images/image-1.png" ]
+image = "images/image-1.png"
 duration = 16.0
 
-# camera_dir = [ -0.35, 1.05, 1.12 ]
 camera_dir = [ -0.40, 1.26, 1.06 ]
 progress_angle = 3.14
 
@@ -29,10 +34,9 @@ keyframes = [
 ]
 
 [[scenes.scene]]
-frames = [ "images/image-2.png" ]
+image = "images/image-2.png"
 duration = 16.0
 
-# camera_dir = [ 0.35, 1.05, 1.12 ]
 camera_dir = [ 0.40, 1.26, 1.06 ]
 progress_angle = 3.14
 
@@ -45,7 +49,23 @@ keyframes = [
 ]
 
 [[scenes.scene]]
-frames = [ "images/image-3.png" ]
+image = "images/image-3.png"
+duration = 8.25
+
+scale = 1.70
+camera_dir = [ -0.40, 1.26, 1.06 ]
+progress_angle = 3.14
+
+keyframes = [
+    { t = 0.0, camera_pos = [ -0.11, -1.77, -1.30 ], progress = -0.05 },
+    { t = 3.62, progress = 21.67, progress_angle = 3.14 },
+    { t = 3.62, progress = 1.72, progress_angle = 0.0 },
+    { t = 7.25, camera_pos = [ 1.51, -1.77, -1.30 ], progress = -20.06 }
+]
+
+
+[[scenes.scene]]
+image = "images/image-4.png"
 duration = 16.0
 
 scale = 3
@@ -53,9 +73,52 @@ camera_dir = [ 0.40, 1.26, 1.06 ]
 progress_angle = 3.14
 
 keyframes = [
-    { t = 0.0, camera_pos = [ -2.75, -3.55, -1.30 ], progress = -0.05 },
+    { t = 0.0, camera_pos = [ -2.25, -3.3, -1.30 ], progress = -0.05 },
     { t = 5.0, progress = 28.23 },
     { t = 10.0, progress = 28.23, progress_angle = 3.14 },
-    { t = 10.0, progress = -6.0, progress_angle = 0.0 },
-    { t = 15.0, camera_pos = [ 0.6, -3.55, -1.30 ], progress = -21.0 }
+    { t = 10.0, progress = 10.0, progress_angle = 0.0 },
+    { t = 15.0, camera_pos = [ 1.1, -3.3, -1.30 ], progress = -19.37 }
+]
+
+[[scenes.scene]]
+image = "images/image-5.png"
+frames = 2
+duration = 12.2
+
+camera_dir = [ -0.40, 1.26, 1.06 ]
+progress_angle = 3.14
+
+keyframes = [
+    { t = 0.0, frame = 0, camera_pos = [ -0.65, -1.76, -1.3 ], progress = 3.15 },
+    { t = 5.6, progress = 36.75, progress_angle = 3.14 },
+    { t = 5.6, progress = 17.6, progress_angle = 0.0 },
+    { t = 11.2, frame = 20, camera_pos = [ 1.50, -1.76, -1.3 ], progress = -16.0 }
+]
+
+[[scenes.scene]]
+image = "images/image-6.png"
+duration = 23.43
+
+camera_dir = [ 0.40, 1.26, 1.06 ]
+progress_angle = -1.57
+
+keyframes = [
+    { t = 0.0, camera_pos = [ -2.41, -4.01, -1.4 ], progress = -0.1 },
+    { t = 11.21, progress = 67.29, progress_angle = -1.57 },
+    { t = 11.21, progress = 47.29, progress_angle = 1.57 },
+    { t = 22.43, camera_pos = [ -2.41, 1.0, -1.3 ], progress = -20.0 }
+]
+
+[[scenes.scene]]
+image = "images/image-7.png"
+duration = 29.9
+
+camera_dir = [ -0.40, 1.26, 1.06 ]
+progress_angle = 3.14
+
+keyframes = [
+    { t = 0.0, camera_pos = [ -2.82, -3.46, -1.4 ], progress = -0.05 },
+    { t = 14.48, progress = 86.83, progress_angle = 3.14 },
+    { t = 14.48, progress = 66.88, progress_angle = 0.0 },
+    { t = 28.9, camera_pos = [ 3.65, -3.46, -1.3 ], progress = -20.0 }
 ]

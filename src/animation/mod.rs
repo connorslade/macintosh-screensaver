@@ -58,22 +58,24 @@ impl Animation {
         let mut scenes = Vec::with_capacity(config.scenes.scene.len());
         for scene in config.scenes.scene.iter() {
             let mut frames = Vec::new();
-            for frame in scene.frames.iter() {
-                let image = ImageReader::open(dir.join(&frame))?
-                    .with_guessed_format()?
-                    .decode()?;
+            let image = ImageReader::open(dir.join(&scene.image))?
+                .with_guessed_format()?
+                .decode()?;
 
+            let height = image.height() / scene.frames;
+            for frame in 0..scene.frames {
                 let mut buffer = BitVec::<u32, Lsb0>::new();
-                for y in 0..image.height() {
+                for y in (height * frame)..(height * (frame + 1)) {
                     for x in 0..image.width() {
-                        let pixel = image.get_pixel(x, y).0[0] != 0;
-                        buffer.push(pixel);
+                        let pixel = image.get_pixel(x, y);
+                        let active = pixel[0] != 0 && pixel[1] != 0 && pixel[2] != 0;
+                        buffer.push(active);
                     }
                 }
 
                 frames.push(Image {
                     data: buffer.into_vec(),
-                    size: Vector2::new(image.width(), image.height()),
+                    size: Vector2::new(image.width(), height),
                 });
             }
 
@@ -109,13 +111,11 @@ impl Animation {
             self.keyframe = 0;
         }
 
-        let frame = ((t / scene_config.frametime) as usize).min(scene_data.frames.len() - 1);
-        let frame = &scene_data.frames[frame];
-
         let animated = scene_data.timeline.get(t);
         let properties = animated
             .combine(&scene_config.properties)
             .with_defaults(&default);
+        let frame = &scene_data.frames[properties.frame % scene_data.frames.len()];
         (properties, &frame)
     }
 

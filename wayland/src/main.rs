@@ -10,12 +10,15 @@ use nalgebra::Vector2;
 use smithay_client_toolkit::{
     compositor::CompositorState,
     output::OutputState,
-    reexports::client::{Connection, Proxy, QueueHandle, globals::registry_queue_init},
+    reexports::client::{
+        Connection, Proxy, QueueHandle, globals::registry_queue_init,
+        protocol::wl_surface::WlSurface,
+    },
     registry::RegistryState,
     seat::SeatState,
     shell::{
         WaylandSurface,
-        wlr_layer::{Layer, LayerShell, LayerShellHandler, LayerSurface, LayerSurfaceConfigure},
+        wlr_layer::{Layer, LayerShell, LayerSurface},
     },
 };
 use wgpu::{
@@ -31,6 +34,8 @@ use macintosh_wallpaper::{
 };
 
 mod impls;
+
+const NAMESPACE: &'static str = "com.connorcode.macintosh-wallpaper";
 
 struct App {
     output_state: OutputState,
@@ -53,6 +58,10 @@ struct Output {
 }
 
 fn main() -> Result<()> {
+    let conn = Connection::connect_to_env()?;
+    let (globals, mut event_queue) = registry_queue_init(&conn)?;
+    let qh = event_queue.handle();
+
     let instance = Instance::new(&InstanceDescriptor::default());
     let adapter =
         pollster::block_on(instance.request_adapter(&RequestAdapterOptions::default())).unwrap();
@@ -73,13 +82,6 @@ fn main() -> Result<()> {
     };
     let renderer = Renderer::new(&gpu, animation);
 
-    let conn = Connection::connect_to_env().unwrap();
-    let (globals, mut event_queue) = registry_queue_init(&conn).unwrap();
-    let qh = event_queue.handle();
-
-    let compositor_state = CompositorState::bind(&globals, &qh)?;
-    let layer_shell = LayerShell::bind(&globals, &qh)?;
-
     let mut app = App {
         output_state: OutputState::new(&globals, &qh),
         seat_state: SeatState::new(&globals, &qh),
@@ -94,13 +96,15 @@ fn main() -> Result<()> {
 
     event_queue.roundtrip(&mut app)?;
 
+    let compositor_state = CompositorState::bind(&globals, &qh)?;
+    let layer_shell = LayerShell::bind(&globals, &qh)?;
     for output in app.output_state.outputs() {
         let surface = compositor_state.create_surface(&qh);
         let layer = layer_shell.create_layer_surface(
             &qh,
             surface,
             Layer::Background,
-            Some("com.connorcode.macintosh-wallpaper"),
+            Some(NAMESPACE),
             Some(&output),
         );
         layer.commit();
@@ -119,6 +123,7 @@ fn main() -> Result<()> {
         let surface = unsafe { app.gpu.instance.create_surface_unsafe(handle)? };
 
         let scale = app.output_state.info(&output).unwrap().scale_factor as u32;
+        layer.set_buffer_scale(scale).unwrap();
         app.outputs.push(Output::new(layer, surface, scale));
     }
 
@@ -129,37 +134,16 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-impl Output {
-    pub fn new(layer: LayerSurface, surface: Surface<'static>, scale_factor: u32) -> Self {
-        Self {
-            surface,
-            layer,
-            scale_factor,
-            needs_config: true,
-            size: Vector2::zeros(),
-        }
-    }
-}
-
-impl LayerShellHandler for App {
-    fn closed(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _window: &LayerSurface) {
-        self.exit = true;
+impl App {
+    fn layer_for_surface(&self, surface: &WlSurface) -> Option<usize> {
+        self.outputs
+            .iter()
+            .position(|x| x.layer.wl_surface().id() == surface.id())
     }
 
-    fn configure(
-        &mut self,
-        _conn: &Connection,
-        qh: &QueueHandle<Self>,
-        layer: &LayerSurface,
-        configure: LayerSurfaceConfigure,
-        _serial: u32,
-    ) {
-        let Some(layer) = self.outputs.iter().position(|x| &x.layer == layer) else {
-            return;
-        };
+    fn configure(&mut self, qh: &QueueHandle<Self>, layer: usize, size: Vector2<u32>) {
         let output = &mut self.outputs[layer];
 
-        let size = Vector2::new(configure.new_size.0, configure.new_size.1) * output.scale_factor;
         let surface_config = SurfaceConfiguration {
             usage: TextureUsages::RENDER_ATTACHMENT,
             format: self.gpu.texture_format,
@@ -178,12 +162,8 @@ impl LayerShellHandler for App {
             let wl_surface = output.layer.wl_surface();
             wl_surface.frame(qh, wl_surface.clone());
         }
-
-        self.render(layer);
     }
-}
 
-impl App {
     fn render(&mut self, output: usize) {
         let output = &mut self.outputs[output];
 
@@ -215,5 +195,17 @@ impl App {
 
         self.gpu.queue.submit(Some(encoder.finish()));
         surface_texture.present();
+    }
+}
+
+impl Output {
+    pub fn new(layer: LayerSurface, surface: Surface<'static>, scale_factor: u32) -> Self {
+        Self {
+            surface,
+            layer,
+            scale_factor,
+            needs_config: true,
+            size: Vector2::zeros(),
+        }
     }
 }

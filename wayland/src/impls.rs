@@ -1,9 +1,10 @@
+use nalgebra::Vector2;
 use smithay_client_toolkit::{
     compositor::CompositorHandler,
     delegate_compositor, delegate_layer, delegate_output, delegate_registry, delegate_seat,
     output::{OutputHandler, OutputState},
     reexports::client::{
-        Connection, Proxy, QueueHandle,
+        Connection, QueueHandle,
         protocol::{
             wl_output::{Transform, WlOutput},
             wl_seat::WlSeat,
@@ -13,10 +14,37 @@ use smithay_client_toolkit::{
     registry::{ProvidesRegistryState, RegistryState},
     registry_handlers,
     seat::{Capability, SeatHandler, SeatState},
-    shell::WaylandSurface,
+    shell::{
+        WaylandSurface,
+        wlr_layer::{LayerShellHandler, LayerSurface, LayerSurfaceConfigure},
+    },
 };
 
 use crate::App;
+
+impl LayerShellHandler for App {
+    fn closed(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _window: &LayerSurface) {
+        self.exit = true;
+    }
+
+    fn configure(
+        &mut self,
+        _conn: &Connection,
+        qh: &QueueHandle<Self>,
+        layer: &LayerSurface,
+        configure: LayerSurfaceConfigure,
+        _serial: u32,
+    ) {
+        let Some(output) = self.outputs.iter().position(|x| &x.layer == layer) else {
+            return;
+        };
+
+        let scale = self.outputs[output].scale_factor;
+        let size = Vector2::new(configure.new_size.0, configure.new_size.1) * scale;
+        self.configure(qh, output, size);
+        self.render(output);
+    }
+}
 
 impl CompositorHandler for App {
     fn scale_factor_changed(
@@ -44,11 +72,7 @@ impl CompositorHandler for App {
         surface: &WlSurface,
         _time: u32,
     ) {
-        let Some(layer) = self
-            .outputs
-            .iter()
-            .position(|x| x.layer.wl_surface().id() == surface.id())
-        else {
+        let Some(layer) = self.layer_for_surface(surface) else {
             return;
         };
 

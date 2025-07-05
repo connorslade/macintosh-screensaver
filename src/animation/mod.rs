@@ -123,7 +123,11 @@ impl Animation {
         self.scenes.len()
     }
 
-    pub fn image(&self, n: usize) -> &Image {
-        &self.scenes[n].frames[0]
+    pub fn frames(&self, n: usize) -> usize {
+        self.config.scenes.scene[n].frames as usize
+    }
+
+    pub fn image(&self, n: usize, frame: usize) -> &Image {
+        &self.scenes[n].frames[frame]
     }
 }

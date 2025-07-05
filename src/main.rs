@@ -59,7 +59,7 @@ struct App {
     animation: Animation,
 
     #[cfg(feature = "manual")]
-    manual_properties: (Properties, usize),
+    manual: (Properties, usize),
 }
 
 impl Interactive for App {
@@ -82,8 +82,8 @@ impl Interactive for App {
 
         #[cfg(feature = "manual")]
         let (properties, image) = (
-            &self.manual_properties.0,
-            self.animation.image(self.manual_properties.1),
+            &self.manual.0,
+            self.animation.image(self.manual.1, self.manual.0.frame),
         );
 
         self.image.upload(&image.data);
@@ -104,14 +104,18 @@ impl Interactive for App {
     #[cfg(feature = "manual")]
     fn ui(&mut self, _gcx: GraphicsCtx, ctx: &Context) {
         Window::new("Macintosh Dynamic Wallpaper").show(ctx, |ui| {
-            let props = &mut self.manual_properties.0;
+            let props = &mut self.manual.0;
 
+            let max_scene = self.animation.scenes() - 1;
             ui.horizontal(|ui| {
-                ui.add(Slider::new(
-                    &mut self.manual_properties.1,
-                    0..=(self.animation.scenes() - 1),
-                ));
-                ui.label("Image");
+                ui.add(Slider::new(&mut self.manual.1, 0..=max_scene));
+                ui.label("Scene");
+            });
+
+            let max_frame = self.animation.frames(self.manual.1) - 1;
+            ui.horizontal(|ui| {
+                ui.add(Slider::new(&mut props.frame, 0..=max_frame));
+                ui.label("Frame");
             });
 
             ui.horizontal(|ui| {
@@ -134,7 +138,8 @@ impl Interactive for App {
 }
 
 fn main() -> Result<()> {
-    let animation = Animation::load("animation/config.toml")?;
+    let animation =
+        Animation::load("/home/connorslade/Programming/macintosh_wallpaper/animation/config.toml")?;
 
     let gpu = Gpu::new()?;
 
@@ -163,7 +168,7 @@ fn main() -> Result<()> {
             background,
 
             #[cfg(feature = "manual")]
-            manual_properties: (animation.config.scenes.properties.clone(), 0),
+            manual: (animation.config.scenes.properties.clone(), 0),
 
             start: Instant::now(),
             animation,

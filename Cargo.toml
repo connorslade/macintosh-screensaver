@@ -1,18 +1,30 @@
+[workspace]
+resolver = "2"
+members = ["wayland"]
+
+[workspace.dependencies]
+anyhow = "1.0.98"
+nalgebra = { version = "0.33.2" ,features = ["serde-serialize"] }
+pollster = "0.4.0"
+wgpu = "24.0.0"
+
 [package]
 name = "macintosh_wallpaper"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-anyhow = "1.0.98"
 bitvec = "1.0.1"
+bytemuck = "1.21.0"
 encase = { version = "0.10.0", features = ["nalgebra"] }
 image = "0.25.6"
+ordered-float = "5.0.0"
+parking_lot = "0.12.3"
 serde = { version = "1.0.219", features = ["derive"] }
 toml = "0.8.23"
-tufa = { path = "../tufa" }
-nalgebra = { version = "0.33.2" ,features = ["serde-serialize"] }
-ordered-float = "5.0.0"
+winit = "0.30.7"
 
-[features]
-manual = []
+anyhow.workspace = true
+nalgebra.workspace = true
+pollster.workspace = true
+wgpu.workspace = true

@@ -1,6 +1,6 @@
 use nalgebra::Vector3;
+use ordered_float::OrderedFloat;
 use serde::Deserialize;
-use tufa::export::egui::emath::OrderedFloat;
 
 use crate::{
     animation::{config::PropertyKeyframe, properties::OptionalProperties},

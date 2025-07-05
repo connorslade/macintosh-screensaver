@@ -1,180 +1,156 @@
-// ↓ Needed due to a rust-analyzer bug
 #![allow(dead_code)]
 
-use std::time::Instant;
+use std::sync::Arc;
 
-use anyhow::Result;
-use encase::ShaderType;
-use tufa::{
-    bindings::buffer::{UniformBuffer, mutability::Immutable},
-    export::{
-        nalgebra::{Matrix4, Vector2, Vector3},
-        wgpu::{CompareFunction, RenderPass, ShaderStages, include_wgsl},
-        winit::window::WindowAttributes,
-    },
-    gpu::Gpu,
-    interactive::{GraphicsCtx, Interactive},
-    pipeline::render::RenderPipeline,
-    prelude::StorageBuffer,
+use anyhow::{Context, Result};
+use nalgebra::Vector2;
+use wgpu::{
+    Color, CommandEncoderDescriptor, Instance, LoadOp, Operations, RenderPassColorAttachment,
+    RenderPassDescriptor, RequestAdapterOptions, StoreOp, Surface, SurfaceConfiguration,
+    TextureFormat, TextureUsages, TextureViewDescriptor,
 };
-#[cfg(feature = "manual")]
-use tufa::{
-    export::egui::{Context, Slider, Window},
-    interactive::ui::{dragger, vec3_dragger},
+use winit::{
+    application::ApplicationHandler,
+    event::WindowEvent,
+    event_loop::{ActiveEventLoop, EventLoop},
+    window::{Window, WindowAttributes, WindowId},
 };
 
-use crate::animation::Animation;
-#[cfg(feature = "manual")]
-use crate::animation::properties::Properties;
+use crate::{
+    animation::Animation,
+    pipelines::{Gpu, Renderer},
+};
 
 mod animation;
 mod interpolate;
+mod pipelines;
 
-#[derive(ShaderType, Default)]
-struct PixelUniform {
-    view: Matrix4<f32>,
-    image_size: Vector2<u32>,
-    window_size: Vector2<u32>,
-    color: Vector3<f32>,
-    cutoff: f32,
-    progress: f32,
-    progress_angle: f32,
+struct Application {
+    gpu: Gpu,
+    state: Option<State>,
 }
 
-#[derive(ShaderType, Default)]
-struct BackgroundUniform {
-    start: Vector3<f32>,
-    end: Vector3<f32>,
-}
+struct State {
+    window: Arc<Window>,
+    surface: Surface<'static>,
 
-struct App {
-    pixel_uniform: UniformBuffer<PixelUniform>,
-    pixels: RenderPipeline,
-    image: StorageBuffer<Vec<u32>, Immutable>,
-
-    background_uniform: UniformBuffer<BackgroundUniform>,
-    background: RenderPipeline,
-
-    start: Instant,
-    animation: Animation,
-
-    #[cfg(feature = "manual")]
-    manual: (Properties, usize),
-}
-
-impl Interactive for App {
-    fn render(&mut self, gcx: GraphicsCtx, render_pass: &mut RenderPass) {
-        let window = gcx.window.inner_size();
-        let aspect = window.width as f32 / window.height as f32;
-
-        let time = self.start.elapsed().as_secs_f32();
-        let t = (time / 60.0) % 1.0;
-
-        let colormap = &self.animation.colormap;
-        let foreground = colormap.get_foreground(t);
-        self.background_uniform.upload(&BackgroundUniform {
-            start: colormap.get_background_top(t),
-            end: colormap.get_background_bottom(t),
-        });
-
-        #[cfg(not(feature = "manual"))]
-        let (properties, image) = self.animation.scene(time);
-
-        #[cfg(feature = "manual")]
-        let (properties, image) = (
-            &self.manual.0,
-            self.animation.image(self.manual.1, self.manual.0.frame),
-        );
-
-        self.image.upload(&image.data);
-        self.pixel_uniform.upload(&PixelUniform {
-            view: properties.view_projection(aspect),
-            image_size: image.size,
-            window_size: Vector2::new(window.width, window.height),
-            color: foreground,
-            cutoff: 0.43,
-            progress: properties.progress,
-            progress_angle: properties.progress_angle,
-        });
-
-        self.background.draw_quad(render_pass, 0..1);
-        self.pixels.draw_quad(render_pass, 0..1);
-    }
-
-    #[cfg(feature = "manual")]
-    fn ui(&mut self, _gcx: GraphicsCtx, ctx: &Context) {
-        Window::new("Macintosh Dynamic Wallpaper").show(ctx, |ui| {
-            let props = &mut self.manual.0;
-
-            let max_scene = self.animation.scenes() - 1;
-            ui.horizontal(|ui| {
-                ui.add(Slider::new(&mut self.manual.1, 0..=max_scene));
-                ui.label("Scene");
-            });
-
-            let max_frame = self.animation.frames(self.manual.1) - 1;
-            ui.horizontal(|ui| {
-                ui.add(Slider::new(&mut props.frame, 0..=max_frame));
-                ui.label("Frame");
-            });
-
-            ui.horizontal(|ui| {
-                vec3_dragger(ui, &mut props.camera_pos, |x| x.speed(0.01));
-                ui.label("Camera Position");
-            });
-
-            ui.horizontal(|ui| {
-                vec3_dragger(ui, &mut props.camera_dir, |x| x.speed(0.01));
-                ui.label("Camera Direction");
-            });
-
-            dragger(ui, "Scale", &mut props.scale, |x| x.speed(0.01));
-            dragger(ui, "Progress Anlge", &mut props.progress_angle, |x| {
-                x.speed(0.01)
-            });
-            dragger(ui, "Progress", &mut props.progress, |x| x.speed(0.01));
-        });
-    }
+    renderer: Renderer,
 }
 
 fn main() -> Result<()> {
-    let animation =
-        Animation::load("/home/connorslade/Programming/macintosh_wallpaper/animation/config.toml")?;
+    let instance = Instance::default();
+    let adapter = pollster::block_on(instance.request_adapter(&RequestAdapterOptions::default()))
+        .context("No adapter found")?;
+    let (device, queue) = pollster::block_on(adapter.request_device(&Default::default(), None))?;
 
-    let gpu = Gpu::new()?;
+    let mut app = Application {
+        gpu: Gpu {
+            instance,
+            adapter,
+            device,
+            queue,
 
-    let image = gpu.create_storage_empty::<Vec<u32>, Immutable>((512_u64 * 342).div_ceil(32));
-    let pixel_uniform = gpu.create_uniform(&PixelUniform::default());
-    let background_uniform = gpu.create_uniform(&BackgroundUniform::default());
-    let pixels = gpu
-        .render_pipeline(include_wgsl!("../shaders/pixels.wgsl"))
-        .depth_compare(CompareFunction::Always)
-        .bind(&pixel_uniform, ShaderStages::VERTEX_FRAGMENT)
-        .bind(&image, ShaderStages::FRAGMENT)
-        .finish();
-    let background = gpu
-        .render_pipeline(include_wgsl!("../shaders/background.wgsl"))
-        .bind(&background_uniform, ShaderStages::FRAGMENT)
-        .finish();
-
-    gpu.create_window(
-        WindowAttributes::default().with_title("Macintosh Dynamic Wallpaper"),
-        App {
-            pixel_uniform,
-            pixels,
-            image,
-
-            background_uniform,
-            background,
-
-            #[cfg(feature = "manual")]
-            manual: (animation.config.scenes.properties.clone(), 0),
-
-            start: Instant::now(),
-            animation,
+            texture_format: TextureFormat::Bgra8UnormSrgb,
         },
-    )
-    .run()?;
+        state: None,
+    };
+
+    let event_loop = EventLoop::new()?;
+    event_loop.run_app(&mut app)?;
 
     Ok(())
+}
+
+impl ApplicationHandler for Application {
+    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        let attrs = WindowAttributes::default().with_title("Macintosh Wallpaper");
+        let window = Arc::new(event_loop.create_window(attrs).unwrap());
+
+        let animation = Animation::load(
+            "/home/connorslade/Programming/macintosh_wallpaper/animation/config.toml",
+        )
+        .unwrap();
+
+        let surface = self.gpu.instance.create_surface(window.clone()).unwrap();
+        let renderer = Renderer::new(&self.gpu, animation);
+        self.state = Some(State {
+            surface,
+            window,
+            renderer,
+        });
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        window_id: WindowId,
+        event: WindowEvent,
+    ) {
+        let Some(state) = &mut self.state else { return };
+        if window_id != state.window.id() {
+            return;
+        }
+
+        match event {
+            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::Resized(_size) => self.resize_surface(),
+            WindowEvent::RedrawRequested => {
+                let output = state.surface.get_current_texture().unwrap();
+
+                let mut encoder = self
+                    .gpu
+                    .device
+                    .create_command_encoder(&CommandEncoderDescriptor::default());
+
+                let view = output
+                    .texture
+                    .create_view(&TextureViewDescriptor::default());
+
+                {
+                    let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                        label: None,
+                        color_attachments: &[Some(RenderPassColorAttachment {
+                            view: &view,
+                            resolve_target: None,
+                            ops: Operations {
+                                load: LoadOp::Clear(Color::BLACK),
+                                store: StoreOp::Store,
+                            },
+                        })],
+                        depth_stencil_attachment: None,
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
+                    });
+
+                    let size = state.window.inner_size();
+                    let size = Vector2::new(size.width, size.height);
+                    state.renderer.render(&self.gpu, size, &mut render_pass);
+                }
+
+                self.gpu.queue.submit([encoder.finish()]);
+
+                output.present();
+                state.window.request_redraw();
+            }
+            _ => {}
+        }
+    }
+}
+
+impl Application {
+    fn resize_surface(&mut self) {
+        let state = self.state.as_mut().unwrap();
+        let size = state.window.inner_size();
+        let config = SurfaceConfiguration {
+            usage: TextureUsages::RENDER_ATTACHMENT,
+            format: self.gpu.texture_format,
+            width: size.width,
+            height: size.height,
+            present_mode: wgpu::PresentMode::AutoVsync,
+            alpha_mode: wgpu::CompositeAlphaMode::Auto,
+            view_formats: vec![],
+            desired_maximum_frame_latency: 2,
+        };
+        state.surface.configure(&self.gpu.device, &config);
+    }
 }

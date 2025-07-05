@@ -1,5 +1,5 @@
 use image::{DynamicImage, GenericImageView, Rgba};
-use tufa::export::nalgebra::Vector3;
+use nalgebra::Vector3;
 
 pub struct Colormap {
     inner: DynamicImage,

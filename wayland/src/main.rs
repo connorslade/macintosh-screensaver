@@ -15,10 +15,7 @@ use smithay_client_toolkit::{
     seat::SeatState,
     shell::{
         WaylandSurface,
-        xdg::{
-            XdgShell,
-            window::{Window, WindowConfigure, WindowDecorations, WindowHandler},
-        },
+        wlr_layer::{Layer, LayerShell, LayerShellHandler, LayerSurface, LayerSurfaceConfigure},
     },
 };
 use wgpu::{
@@ -41,51 +38,24 @@ struct App {
     registry_state: RegistryState,
 
     renderer: Renderer,
-    surface: Surface<'static>,
     gpu: Gpu,
     exit: bool,
 
-    window: Window,
+    outputs: Vec<Output>,
+}
+
+struct Output {
+    surface: Surface<'static>,
+    layer: LayerSurface,
+    scale_factor: u32,
     needs_config: bool,
     size: Vector2<u32>,
 }
 
 fn main() -> Result<()> {
-    let conn = Connection::connect_to_env().unwrap();
-    let (globals, mut event_queue) = registry_queue_init(&conn).unwrap();
-    let qh = event_queue.handle();
-
-    let compositor_state = CompositorState::bind(&globals, &qh)?;
-    let xdg_shell_state = XdgShell::bind(&globals, &qh)?;
-
-    let surface = compositor_state.create_surface(&qh);
-    let window = xdg_shell_state.create_window(surface, WindowDecorations::ServerDefault, &qh);
-    window.set_title("Macintosh Wallpaper");
-    window.set_app_id("com.connorcode.macintosh-wallpaper");
-    window.commit();
-
     let instance = Instance::new(&InstanceDescriptor::default());
-
-    let raw_display_handle = RawDisplayHandle::Wayland(WaylandDisplayHandle::new(
-        NonNull::new(conn.backend().display_ptr() as _).unwrap(),
-    ));
-    let raw_window_handle = RawWindowHandle::Wayland(WaylandWindowHandle::new(
-        NonNull::new(window.wl_surface().id().as_ptr() as _).unwrap(),
-    ));
-
-    let surface = unsafe {
-        instance.create_surface_unsafe(SurfaceTargetUnsafe::RawHandle {
-            raw_display_handle,
-            raw_window_handle,
-        })?
-    };
-
-    let adapter = pollster::block_on(instance.request_adapter(&RequestAdapterOptions {
-        compatible_surface: Some(&surface),
-        ..Default::default()
-    }))
-    .unwrap();
-
+    let adapter =
+        pollster::block_on(instance.request_adapter(&RequestAdapterOptions::default())).unwrap();
     let (device, queue) =
         pollster::block_on(adapter.request_device(&DeviceDescriptor::default(), None))?;
 
@@ -103,31 +73,76 @@ fn main() -> Result<()> {
     };
     let renderer = Renderer::new(&gpu, animation);
 
+    let conn = Connection::connect_to_env().unwrap();
+    let (globals, mut event_queue) = registry_queue_init(&conn).unwrap();
+    let qh = event_queue.handle();
+
+    let compositor_state = CompositorState::bind(&globals, &qh)?;
+    let layer_shell = LayerShell::bind(&globals, &qh)?;
+
     let mut app = App {
         output_state: OutputState::new(&globals, &qh),
         seat_state: SeatState::new(&globals, &qh),
         registry_state: RegistryState::new(&globals),
 
         renderer,
-        surface,
         gpu,
         exit: false,
 
-        window,
-        needs_config: true,
-        size: Vector2::zeros(),
+        outputs: Vec::new(),
     };
+
+    event_queue.roundtrip(&mut app)?;
+
+    for output in app.output_state.outputs() {
+        let surface = compositor_state.create_surface(&qh);
+        let layer = layer_shell.create_layer_surface(
+            &qh,
+            surface,
+            Layer::Background,
+            Some("com.connorcode.macintosh-wallpaper"),
+            Some(&output),
+        );
+        layer.commit();
+
+        let raw_display_handle = RawDisplayHandle::Wayland(WaylandDisplayHandle::new(
+            NonNull::new(conn.backend().display_ptr() as _).unwrap(),
+        ));
+        let raw_window_handle = RawWindowHandle::Wayland(WaylandWindowHandle::new(
+            NonNull::new(layer.wl_surface().id().as_ptr() as _).unwrap(),
+        ));
+
+        let handle = SurfaceTargetUnsafe::RawHandle {
+            raw_display_handle,
+            raw_window_handle,
+        };
+        let surface = unsafe { app.gpu.instance.create_surface_unsafe(handle)? };
+
+        let scale = app.output_state.info(&output).unwrap().scale_factor as u32;
+        app.outputs.push(Output::new(layer, surface, scale));
+    }
 
     while !app.exit {
         event_queue.blocking_dispatch(&mut app)?;
     }
 
-    drop(app.surface);
     Ok(())
 }
 
-impl WindowHandler for App {
-    fn request_close(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _window: &Window) {
+impl Output {
+    pub fn new(layer: LayerSurface, surface: Surface<'static>, scale_factor: u32) -> Self {
+        Self {
+            surface,
+            layer,
+            scale_factor,
+            needs_config: true,
+            size: Vector2::zeros(),
+        }
+    }
+}
+
+impl LayerShellHandler for App {
+    fn closed(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, _window: &LayerSurface) {
         self.exit = true;
     }
 
@@ -135,39 +150,44 @@ impl WindowHandler for App {
         &mut self,
         _conn: &Connection,
         qh: &QueueHandle<Self>,
-        _window: &Window,
-        configure: WindowConfigure,
+        layer: &LayerSurface,
+        configure: LayerSurfaceConfigure,
         _serial: u32,
     ) {
-        self.size = Vector2::new(configure.new_size.0, configure.new_size.1)
-            .map(|x| x.map(|x| x.get()).unwrap_or(1));
+        let Some(layer) = self.outputs.iter().position(|x| &x.layer == layer) else {
+            return;
+        };
+        let output = &mut self.outputs[layer];
 
+        let size = Vector2::new(configure.new_size.0, configure.new_size.1) * output.scale_factor;
         let surface_config = SurfaceConfiguration {
             usage: TextureUsages::RENDER_ATTACHMENT,
             format: self.gpu.texture_format,
             view_formats: vec![],
             alpha_mode: CompositeAlphaMode::Auto,
-            width: self.size.x,
-            height: self.size.y,
+            width: size.x,
+            height: size.y,
             desired_maximum_frame_latency: 2,
             present_mode: PresentMode::Mailbox,
         };
 
-        self.surface.configure(&self.gpu.device, &surface_config);
+        output.surface.configure(&self.gpu.device, &surface_config);
+        output.size = size;
 
-        if mem::take(&mut self.needs_config) {
-            self.window
-                .wl_surface()
-                .frame(qh, self.window.wl_surface().clone());
+        if mem::take(&mut output.needs_config) {
+            let wl_surface = output.layer.wl_surface();
+            wl_surface.frame(qh, wl_surface.clone());
         }
 
-        self.render();
+        self.render(layer);
     }
 }
 
 impl App {
-    fn render(&mut self) {
-        let surface_texture = self.surface.get_current_texture().unwrap();
+    fn render(&mut self, output: usize) {
+        let output = &mut self.outputs[output];
+
+        let surface_texture = output.surface.get_current_texture().unwrap();
         let view = surface_texture
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
@@ -189,7 +209,8 @@ impl App {
                 occlusion_query_set: None,
             });
 
-            self.renderer.render(&self.gpu, self.size, &mut render_pass);
+            self.renderer
+                .render(&self.gpu, output.size, &mut render_pass);
         }
 
         self.gpu.queue.submit(Some(encoder.finish()));

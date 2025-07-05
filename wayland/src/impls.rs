@@ -1,10 +1,9 @@
 use smithay_client_toolkit::{
     compositor::CompositorHandler,
-    delegate_compositor, delegate_output, delegate_registry, delegate_seat, delegate_xdg_shell,
-    delegate_xdg_window,
+    delegate_compositor, delegate_layer, delegate_output, delegate_registry, delegate_seat,
     output::{OutputHandler, OutputState},
     reexports::client::{
-        Connection, QueueHandle,
+        Connection, Proxy, QueueHandle,
         protocol::{
             wl_output::{Transform, WlOutput},
             wl_seat::WlSeat,
@@ -45,13 +44,25 @@ impl CompositorHandler for App {
         surface: &WlSurface,
         _time: u32,
     ) {
-        if !self.needs_config {
-            self.render();
+        let Some(layer) = self
+            .outputs
+            .iter()
+            .position(|x| x.layer.wl_surface().id() == surface.id())
+        else {
+            return;
+        };
 
-            self.window
-                .wl_surface()
-                .damage_buffer(0, 0, self.size.x as i32, self.size.y as i32);
-            self.window.wl_surface().frame(qh, surface.clone());
+        if !self.outputs[layer].needs_config {
+            self.render(layer);
+
+            let output = &mut self.outputs[layer];
+            output.layer.wl_surface().damage_buffer(
+                0,
+                0,
+                output.size.x as i32,
+                output.size.y as i32,
+            );
+            output.layer.wl_surface().frame(qh, surface.clone());
             surface.commit();
         }
     }
@@ -124,10 +135,6 @@ impl ProvidesRegistryState for App {
 
 delegate_compositor!(App);
 delegate_output!(App);
-
 delegate_seat!(App);
-
-delegate_xdg_shell!(App);
-delegate_xdg_window!(App);
-
+delegate_layer!(App);
 delegate_registry!(App);

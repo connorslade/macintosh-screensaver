@@ -1,25 +1,25 @@
 use nalgebra::Vector3;
 use ordered_float::OrderedFloat;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     animation::{config::PropertyKeyframe, properties::OptionalProperties},
     interpolate::Interpolate,
 };
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(transparent)]
 pub struct Timeline<T> {
     pub keyframes: Vec<Keyframe<T>>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Keyframe<T> {
     pub t: f32,
     pub value: T,
 }
 
-#[derive(Default)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct PropertiesTimeline {
     camera_pos: Timeline<Vector3<f32>>,
     camera_dir: Timeline<Vector3<f32>>,

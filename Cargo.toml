@@ -28,3 +28,4 @@ anyhow.workspace = true
 nalgebra.workspace = true
 pollster.workspace = true
 wgpu.workspace = true
+bincode = { version = "2.0.1", features = ["serde"] }

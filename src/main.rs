@@ -57,13 +57,10 @@ fn main() -> Result<()> {
 
 impl ApplicationHandler for Application {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        let animation = Animation::load(include_bytes!("../animation/animation.bin")).unwrap();
+
         let attrs = WindowAttributes::default().with_title("Macintosh Wallpaper");
         let window = Arc::new(event_loop.create_window(attrs).unwrap());
-
-        let animation = Animation::load(
-            "/home/connorslade/Programming/macintosh_wallpaper/animation/config.toml",
-        )
-        .unwrap();
 
         let surface = self.gpu.instance.create_surface(window.clone()).unwrap();
         let renderer = Renderer::new(&self.gpu, animation);

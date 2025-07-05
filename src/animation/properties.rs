@@ -1,9 +1,9 @@
 use nalgebra::{Matrix4, Vector3};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::interpolate::Interpolate;
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct OptionalProperties {
     pub camera_pos: Option<Vector3<f32>>,
     pub camera_dir: Option<Vector3<f32>>,
@@ -13,7 +13,7 @@ pub struct OptionalProperties {
     pub progress_angle: Option<f32>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Properties {
     pub camera_pos: Vector3<f32>,
     pub camera_dir: Vector3<f32>,

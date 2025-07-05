@@ -68,9 +68,7 @@ fn main() -> Result<()> {
     let (device, queue) =
         pollster::block_on(adapter.request_device(&DeviceDescriptor::default(), None))?;
 
-    let animation =
-        Animation::load("/home/connorslade/Programming/macintosh_wallpaper/animation/config.toml")
-            .unwrap();
+    let animation = Animation::load(include_bytes!("../../animation/animation.bin"))?;
 
     let gpu = Gpu {
         instance,

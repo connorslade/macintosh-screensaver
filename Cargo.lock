@@ -2526,6 +2526,7 @@ name = "wayland"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "macintosh_wallpaper",
  "nalgebra",
  "pollster",
  "smithay-client-toolkit",

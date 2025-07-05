@@ -11,7 +11,7 @@ use wgpu::{
     VertexState,
 };
 
-use crate::Gpu;
+use crate::pipelines::Gpu;
 
 pub struct BackgroundPipeline {
     pipeline: RenderPipeline,

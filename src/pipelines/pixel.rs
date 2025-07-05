@@ -11,7 +11,7 @@ use wgpu::{
     ShaderModuleDescriptor, ShaderSource, ShaderStages, VertexState,
 };
 
-use crate::Gpu;
+use crate::pipelines::Gpu;
 
 pub struct PixelsPipeline {
     pipeline: RenderPipeline,

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -16,14 +14,10 @@ use winit::{
     window::{Window, WindowAttributes, WindowId},
 };
 
-use crate::{
+use macintosh_wallpaper::{
     animation::Animation,
     pipelines::{Gpu, Renderer},
 };
-
-mod animation;
-mod interpolate;
-mod pipelines;
 
 struct Application {
     gpu: Gpu,

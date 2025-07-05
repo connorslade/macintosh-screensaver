@@ -35,7 +35,7 @@ use macintosh_wallpaper::{
 
 mod impls;
 
-const NAMESPACE: &'static str = "com.connorcode.macintosh-wallpaper";
+const NAMESPACE: &str = "com.connorcode.macintosh-wallpaper";
 
 struct App {
     output_state: OutputState,

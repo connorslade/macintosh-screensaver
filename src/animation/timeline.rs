@@ -38,7 +38,7 @@ impl<T: Interpolate + Copy> Timeline<T> {
         for i in 0..self.keyframes.len() {
             let keyframe = &self.keyframes[i];
             if t < keyframe.t {
-                let Some(ref last) = self.keyframes.get(i - 1) else {
+                let Some(last) = self.keyframes.get(i - 1) else {
                     return Some(keyframe.value);
                 };
 

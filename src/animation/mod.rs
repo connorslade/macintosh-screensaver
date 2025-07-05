@@ -114,9 +114,9 @@ impl Animation {
         let animated = scene_data.timeline.get(t);
         let properties = animated
             .combine(&scene_config.properties)
-            .with_defaults(&default);
+            .with_defaults(default);
         let frame = &scene_data.frames[properties.frame % scene_data.frames.len()];
-        (properties, &frame)
+        (properties, frame)
     }
 
     pub fn scenes(&self) -> usize {

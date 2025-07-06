@@ -74,7 +74,7 @@ impl Renderer {
             image_size: image.size,
             window_size: size,
             color: foreground,
-            cutoff: 0.43,
+            scale: properties.scale,
             progress: properties.progress,
             progress_angle: properties.progress_angle,
         };

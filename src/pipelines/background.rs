@@ -31,8 +31,9 @@ impl BackgroundPipeline {
 
         let shader = device.create_shader_module(ShaderModuleDescriptor {
             label: None,
-            source: ShaderSource::Wgsl(Cow::Borrowed(include_str!(
-                "../../shaders/background.wgsl"
+            source: ShaderSource::Wgsl(Cow::Borrowed(concat!(
+                include_str!("../../shaders/common.wgsl"),
+                include_str!("../../shaders/background.wgsl")
             ))),
         });
 

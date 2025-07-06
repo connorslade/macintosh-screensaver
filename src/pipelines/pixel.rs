@@ -26,7 +26,7 @@ pub struct PixelsUniform {
     pub image_size: Vector2<u32>,
     pub window_size: Vector2<u32>,
     pub color: Vector3<f32>,
-    pub cutoff: f32,
+    pub scale: f32,
     pub progress: f32,
     pub progress_angle: f32,
 }
@@ -37,7 +37,10 @@ impl PixelsPipeline {
 
         let shader = device.create_shader_module(ShaderModuleDescriptor {
             label: None,
-            source: ShaderSource::Wgsl(Cow::Borrowed(include_str!("../../shaders/pixels.wgsl"))),
+            source: ShaderSource::Wgsl(Cow::Borrowed(concat!(
+                include_str!("../../shaders/common.wgsl"),
+                include_str!("../../shaders/pixels.wgsl")
+            ))),
         });
 
         let uniform = device.create_buffer(&BufferDescriptor {

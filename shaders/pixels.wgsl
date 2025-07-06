@@ -7,43 +7,47 @@ struct Uniform {
     window_size: vec2u,
 
     color: vec3f,
-    cutoff: f32,
+    scale: f32,
     progress: f32,
     progress_angle: f32
 }
 
-struct VertexOutput {
-    @builtin(position) pos: vec4<f32>,
-    @location(1) uv: vec2<f32>,
-};
-
 @vertex
 fn vert(@builtin(vertex_index) index: u32) -> VertexOutput {
-    var uvs = array(
-        vec2(0.0, 0.0), vec2(1.0, 0.0),
-        vec2(1.0, 1.0), vec2(0.0, 1.0)
-    );
-    var points = array(
-        vec2(-1.0, -1.0), vec2(1.0, -1.0),
-        vec2(1.0, 1.0), vec2(-1.0, 1.0)
-    );
-
-    return VertexOutput(ctx.view * vec4(points[index], 0.0, 1.0), uvs[index]);
+    return VertexOutput(ctx.view * vec4(QUAD_POS[index], 0.0, 1.0), QUAD_UV[index]);
 }
 
 @fragment
 fn frag(in: VertexOutput) -> @location(0) vec4<f32> {
-    let pos = in.uv * vec2f(ctx.image_size) - vec2(0.5);
+    return vec4(ctx.color, 1.0) * evaluate(in.uv);
+}
+
+fn evaluate(uv: vec2f) -> f32 {
+    let pos = uv * vec2f(ctx.image_size) - vec2(0.5);
+
     let rounded = round(pos);
-
     let dist = chebyshev_distance(pos - rounded);
-    let edge = dist - (ctx.cutoff * saturate((in.uv.x * cos(ctx.progress_angle) + in.uv.y * sin(ctx.progress_angle)) * 20.0 + ctx.progress));
-    // ↑ todo: make image size independent
 
-    let idx = u32(rounded.y) * ctx.image_size.x + u32(rounded.x);
-    let pixel = (image[idx / 32] & (1u << (idx % 32))) != 0;
+    let min_side = min(f32(ctx.window_size.x), f32(ctx.window_size.y));
+    let cutoff = remap(1015.0, 2160.0, 0.40, 0.42, min_side);
 
-    return vec4(ctx.color, 1.0) * (1.0 - (f32(pixel) + saturate(edge * 20.0)));
+    let progress = progress(uv);
+    if progress < 0.05 { return 0.0; }
+    let edge = dist - cutoff * saturate(progress(uv));
+
+    let pixel = pixel(vec2u(rounded));
+    let value = f32(pixel) + saturate(edge * 20.0);
+    return saturate(1.0 - value);
+}
+
+fn pixel(pos: vec2u) -> bool {
+    let idx = pos.y * ctx.image_size.x + pos.x;
+    return (image[idx / 32] & (1u << (idx % 32))) != 0;
+}
+
+fn progress(uv: vec2f) -> f32 {
+    let vec = vec2(cos(ctx.progress_angle), sin(ctx.progress_angle));
+    return (uv.x * vec.x + uv.y * vec.y) * 20.0 + ctx.progress;
 }
 
 fn chebyshev_distance(vec: vec2f) -> f32 {

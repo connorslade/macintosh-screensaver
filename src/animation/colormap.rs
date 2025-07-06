@@ -40,7 +40,7 @@ impl Colormap {
 
     fn get_color(&self, x: u32, t: f32) -> Vector3<f32> {
         let height = self.inner.height() as f32;
-        let px = height * (t + self.offset);
+        let px = height * ((t + self.offset) % 1.0);
 
         let low = self.inner.get_pixel(x, px.floor() as u32);
         let high = self.inner.get_pixel(x, (px.ceil() % height) as u32);

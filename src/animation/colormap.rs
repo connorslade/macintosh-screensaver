@@ -1,5 +1,6 @@
 use image::{DynamicImage, EncodableLayout, Rgb, RgbImage};
 use nalgebra::Vector3;
+use rand::Rng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Serialize, Deserialize)]
@@ -9,6 +10,8 @@ pub struct Colormap {
         deserialize_with = "deserialize_image"
     )]
     inner: RgbImage,
+    #[serde(skip, default = "random_offset")]
+    offset: f32,
 }
 
 const COLUMN_BACKGROUND_TOP: u32 = 0;
@@ -19,6 +22,7 @@ impl Colormap {
     pub fn new(image: DynamicImage) -> Self {
         Self {
             inner: image.into_rgb8(),
+            offset: random_offset(),
         }
     }
 
@@ -36,7 +40,7 @@ impl Colormap {
 
     fn get_color(&self, x: u32, t: f32) -> Vector3<f32> {
         let height = self.inner.height() as f32;
-        let px = height * t;
+        let px = height * (t + self.offset);
 
         let low = self.inner.get_pixel(x, px.floor() as u32);
         let high = self.inner.get_pixel(x, (px.ceil() % height) as u32);
@@ -68,4 +72,8 @@ fn deserialize_image<'de, D: Deserializer<'de>>(deserializer: D) -> Result<RgbIm
     let height = raw.data.len() as u32 / raw.width / 3;
     let image = RgbImage::from_raw(raw.width, height, raw.data).unwrap();
     Ok(image)
+}
+
+fn random_offset() -> f32 {
+    rand::rng().random()
 }

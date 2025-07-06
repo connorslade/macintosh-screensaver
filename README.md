@@ -16,5 +16,6 @@ The layer shell version can be used as a lock screen on sway with [swaylock-plug
 - [x] login screen?
 - [x] embed default resources
 - [ ] expose cli
-- [ ] randomize starting points (colormap & scene) (also randomize scene order?)
+- [x] randomize starting points (colormap & scene)
+- [ ] randomize scene order?
 - [ ] drop shadow

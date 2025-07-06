@@ -14,12 +14,14 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+bincode = { version = "2.0.1", features = ["serde"] }
 bitvec = "1.0.1"
 bytemuck = "1.21.0"
 encase = { version = "0.10.0", features = ["nalgebra"] }
 image = "0.25.6"
 ordered-float = "5.0.0"
 parking_lot = "0.12.3"
+rand = "0.9.1"
 serde = { version = "1.0.219", features = ["derive"] }
 toml = "0.8.23"
 winit = "0.30.7"
@@ -28,4 +30,3 @@ anyhow.workspace = true
 nalgebra.workspace = true
 pollster.workspace = true
 wgpu.workspace = true
-bincode = { version = "2.0.1", features = ["serde"] }

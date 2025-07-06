@@ -7,6 +7,7 @@ use anyhow::{Context, Result};
 use bitvec::{order::Lsb0, vec::BitVec};
 use image::{GenericImageView, ImageReader};
 use nalgebra::Vector2;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 use crate::animation::{
@@ -29,8 +30,6 @@ pub struct Animation {
 
     #[serde(skip)]
     pub scene_timer: Timer,
-    #[serde(skip)]
-    pub frame_timer: Timer,
     #[serde(skip)]
     pub keyframe: usize,
 }
@@ -57,7 +56,10 @@ pub struct Image {
 
 impl Animation {
     pub fn load(data: &[u8]) -> Result<Self> {
-        Ok(bincode::serde::decode_from_slice(data, bincode::config::standard())?.0)
+        let mut this =
+            bincode::serde::decode_from_slice::<Self, _>(data, bincode::config::standard())?.0;
+        this.scene_timer = Timer::new(this.scenes());
+        Ok(this)
     }
 
     pub fn load_dev(path: impl AsRef<Path>) -> Result<Self> {
@@ -104,17 +106,14 @@ impl Animation {
             });
         }
 
-        let this = Self {
+        Ok(Self {
+            scene_timer: Timer::new(scenes.len()),
+            keyframe: 0,
+
             colormap,
             scenes,
             defaults: config.scenes.properties,
-
-            scene_timer: Timer::default(),
-            frame_timer: Timer::default(),
-            keyframe: 0,
-        };
-
-        Ok(this)
+        })
     }
 
     pub fn export(&self, path: impl AsRef<Path>) -> Result<()> {
@@ -135,8 +134,6 @@ impl Animation {
         if t > scene.duration {
             self.scene_timer.offset = time;
             self.scene_timer.index = (self.scene_timer.index + 1) % self.scenes.len();
-            self.frame_timer.index = 0;
-            self.frame_timer.offset = 0.0;
             self.keyframe = 0;
         }
 
@@ -158,5 +155,15 @@ impl Animation {
 
     pub fn image(&self, n: usize, frame: usize) -> &Image {
         &self.scenes[n].frames[frame]
+    }
+}
+
+impl Timer {
+    fn new(max: usize) -> Self {
+        let mut rng = rand::rng();
+        Timer {
+            index: rng.random_range(0..max),
+            offset: 0.0,
+        }
     }
 }

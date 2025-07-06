@@ -1,4 +1,5 @@
-# janky ass python code to extract the color pallette from a video of the real macos screensaver
+# janky python code to extract the color pallette from a video of the real MacOs screensaver.
+# The output of this needs a lot of manual work to be usable.
 
 import math
 from collections import Counter
@@ -6,8 +7,8 @@ from collections import Counter
 import cv2
 import numpy
 
-video_path = '/home/connorslade/Downloads/NEW Sequoia Macintosh Screen Saver HD [FULL VIDEO LOOP!!!] [pnjxehheT_I].webm'
-brightness = 128
+video_path = '＂Macintosh＂ Dynamic Wallpaper from macOS 15 Sequoia [OYpfKUcANkw].webm'
+height = 3606
 
 def rgb_distance(a, b):
     return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2)
@@ -30,29 +31,12 @@ def top_colors(pixels, threshold = 10):
     return out
 
 def colors_to_image(colors):
-    return numpy.array(list([x] for x in colors), dtype=numpy.uint8)
+    return numpy.reshape(numpy.array(colors, dtype=numpy.uint8), (-1, height))
 
-def is_background(color):
-    return color[0] >= brightness and color[1] >= brightness and color[2] >= brightness
-
-def is_foreground(color):
-    return color[0] < brightness and color[1] < brightness and color[2] < brightness
-
-def add_background(list, row, invert = False):
-    out = top_colors(row)
-    top = Counter({color: count for color, count in out.items() if is_background(color) ^ invert})
+def add_color(list, row, foreground = False):
+    top = Counter({color: count for color, count in top_colors(row).items() if (sum(color) / 3 > 100) ^ foreground})
     common = top.most_common(1)
-
-    if len(common) > 0:
-        list.append(common[0][0])
-
-def add_foreground(list, image):
-    out = top_colors(sum(image[int(height / 2):int(height / 2 + 1)]))
-    top = Counter({color: count for color, count in out.items() if is_foreground(color)})
-    common = top.most_common(1)
-
-    if len(common) > 0:
-        list.append(common[0][0])
+    list.append(common[0][0] if len(common) > 0 else (0, 0, 0))
 
 cap = cv2.VideoCapture(video_path)
 fps = cap.get(cv2.CAP_PROP_FPS)
@@ -62,7 +46,7 @@ top = []
 bottom = []
 foreground = []
 
-frames = int(round(fps * 60))
+frames = height * 10
 for i in range(frames):
     print(f'{i}/{frames}')
 
@@ -70,9 +54,11 @@ for i in range(frames):
     if not ret:
         break
 
-    add_background(top, frame[0])
-    add_background(bottom, frame[height - 1])
-    add_foreground(foreground, frame)
+    add_color(top, frame[0])
+    add_color(bottom, frame[height - 1])
+
+    center = sum(frame[int(height / 2):int(height / 2 + 1)])
+    add_color(foreground, center, foreground = True)
 
 cap.release()
 

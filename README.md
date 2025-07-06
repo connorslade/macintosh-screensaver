@@ -11,8 +11,10 @@ The layer shell version can be used as a lock screen on sway with [swaylock-plug
 
 - [x] animated images
 - [x] make a bunch of scenes
-- [ ] fix color palette
+- [x] fix color palette
 - [ ] make pixels shader image size / scale independent
 - [x] login screen?
 - [x] embed default resources
 - [ ] expose cli
+- [ ] randomize starting points (colormap & scene) (also randomize scene order?)
+- [ ] drop shadow

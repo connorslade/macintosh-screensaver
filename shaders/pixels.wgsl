@@ -28,21 +28,19 @@ fn evaluate(uv: vec2f) -> f32 {
     let rounded = round(pos);
     let dist = chebyshev_distance(pos - rounded);
 
-    let min_side = min(f32(ctx.window_size.x), f32(ctx.window_size.y));
-    let cutoff = remap(1015.0, 2160.0, 0.40, 0.42, min_side);
-
     let progress = progress(uv);
-    if progress < 0.05 { return 0.0; }
-    let edge = dist - cutoff * saturate(progress(uv));
+    let edge = dist - 0.45 * saturate(progress(uv));
 
     let pixel = pixel(vec2u(rounded));
-    let value = f32(pixel) + saturate(edge * 20.0);
+    let cutoff_width = fwidth(dist);
+    var value = f32(!pixel) + smoothstep(-cutoff_width, cutoff_width, edge);
+
     return saturate(1.0 - value);
 }
 
 fn pixel(pos: vec2u) -> bool {
     let idx = pos.y * ctx.image_size.x + pos.x;
-    return (image[idx / 32] & (1u << (idx % 32))) != 0;
+    return (image[idx / 32] & (1u << (idx % 32))) == 0;
 }
 
 fn progress(uv: vec2f) -> f32 {

@@ -96,6 +96,11 @@ fn main() -> Result<()> {
 
     let compositor_state = CompositorState::bind(&globals, &qh)?;
     let layer_shell = LayerShell::bind(&globals, &qh)?;
+
+    let raw_display_handle = RawDisplayHandle::Wayland(WaylandDisplayHandle::new(
+        NonNull::new(conn.backend().display_ptr() as _).unwrap(),
+    ));
+
     for output in app.output_state.outputs() {
         let surface = compositor_state.create_surface(&qh);
         let layer = layer_shell.create_layer_surface(
@@ -107,16 +112,11 @@ fn main() -> Result<()> {
         );
         layer.commit();
 
-        let raw_display_handle = RawDisplayHandle::Wayland(WaylandDisplayHandle::new(
-            NonNull::new(conn.backend().display_ptr() as _).unwrap(),
-        ));
-        let raw_window_handle = RawWindowHandle::Wayland(WaylandWindowHandle::new(
-            NonNull::new(layer.wl_surface().id().as_ptr() as _).unwrap(),
-        ));
-
         let handle = SurfaceTargetUnsafe::RawHandle {
             raw_display_handle,
-            raw_window_handle,
+            raw_window_handle: RawWindowHandle::Wayland(WaylandWindowHandle::new(
+                NonNull::new(layer.wl_surface().id().as_ptr() as _).unwrap(),
+            )),
         };
         let surface = unsafe { app.gpu.instance.create_surface_unsafe(handle)? };
 

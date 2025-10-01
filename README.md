@@ -46,7 +46,7 @@ swaylock-plugin --command path/to/macintosh-screensaver-layer
 - [x] animated images
 - [x] make a bunch of scenes
 - [x] fix color palette
-- [ ] make pixels shader image size / scale independent
+- [x] make pixels shader image size / scale independent
 - [x] login screen?
 - [x] embed default resources
 - [ ] expose cli

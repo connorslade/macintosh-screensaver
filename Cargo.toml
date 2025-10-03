@@ -17,6 +17,7 @@ edition = "2024"
 bincode = { version = "2.0.1", features = ["serde"] }
 bitvec = "1.0.1"
 bytemuck = "1.21.0"
+clap = { version = "4.5.48", features = ["derive"] }
 encase = { version = "0.10.0", features = ["nalgebra"] }
 image = "0.25.6"
 ordered-float = "5.0.0"

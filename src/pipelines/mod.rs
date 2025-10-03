@@ -60,12 +60,22 @@ impl Renderer {
         let time = self.start.elapsed().as_secs_f32();
         let t = (time / 60.0) % 1.0;
 
+        let rt = &self.animation.runtime;
+        let (fd, fi, fo) = (rt.fade_duration, rt.fade_in, rt.fade_out);
+
+        let fade_in = if fi { (time / fd).clamp(0.0, 1.0) } else { 1.0 };
+        let fade_out = (fo.map(|fo| ((fo - fd - time) / 3.0).clamp(0.0, 1.0))).unwrap_or(1.0);
+        let fade = fade_in * fade_out;
+        if fade <= 0.0 {
+            return;
+        }
+
         let colormap = &self.animation.colormap;
         let foreground = colormap.get_foreground(t);
 
         let background_uniform = BackgroundUniform {
-            start: colormap.get_background_top(t),
-            end: colormap.get_background_bottom(t),
+            start: colormap.get_background_top(t) * fade,
+            end: colormap.get_background_bottom(t) * fade,
         };
 
         let (properties, image) = self.animation.scene(time);
@@ -73,7 +83,7 @@ impl Renderer {
             view: properties.view_projection(aspect),
             image_size: image.size,
             window_size: size,
-            color: foreground,
+            color: foreground * fade,
             scale: properties.scale,
             progress: properties.progress,
             progress_angle: properties.progress_angle,

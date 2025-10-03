@@ -68,7 +68,8 @@ fn main() -> Result<()> {
     let (device, queue) =
         pollster::block_on(adapter.request_device(&DeviceDescriptor::default(), None))?;
 
-    let animation = Animation::load(include_bytes!("../../animation/animation.bin"))?;
+    let config = include_bytes!("../../animation/animation.bin");
+    let animation = Animation::load(config)?.runtime_from_args();
 
     let gpu = Gpu {
         instance,

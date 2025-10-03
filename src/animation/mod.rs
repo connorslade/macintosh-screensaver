@@ -5,6 +5,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use bitvec::{order::Lsb0, vec::BitVec};
+use clap::Parser;
 use image::{GenericImageView, ImageReader};
 use nalgebra::Vector2;
 use rand::Rng;
@@ -32,6 +33,18 @@ pub struct Animation {
     pub scene_timer: Timer,
     #[serde(skip)]
     pub keyframe: usize,
+    #[serde(skip)]
+    pub runtime: RuntimeConfig,
+}
+
+#[derive(Parser, Default)]
+pub struct RuntimeConfig {
+    #[arg(long, default_value_t = 0.0)]
+    pub fade_duration: f32,
+    #[arg(long)]
+    pub fade_in: bool,
+    #[arg(long)]
+    pub fade_out: Option<f32>,
 }
 
 #[derive(Default)]
@@ -113,7 +126,19 @@ impl Animation {
             colormap,
             scenes,
             defaults: config.scenes.properties,
+            runtime: RuntimeConfig::default(),
         })
+    }
+
+    pub fn runtime_from_args(self) -> Self {
+        Self {
+            runtime: RuntimeConfig::parse(),
+            ..self
+        }
+    }
+
+    pub fn with_runtime(self, runtime: RuntimeConfig) -> Self {
+        Self { runtime, ..self }
     }
 
     pub fn export(&self, path: impl AsRef<Path>) -> Result<()> {

@@ -57,7 +57,8 @@ fn main() -> Result<()> {
 
 impl ApplicationHandler for Application {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        let animation = Animation::load(include_bytes!("../animation/animation.bin")).unwrap();
+        let config = include_bytes!("../animation/animation.bin");
+        let animation = Animation::load(config).unwrap().runtime_from_args();
 
         let attrs = WindowAttributes::default().with_title("Macintosh Wallpaper");
         let window = Arc::new(event_loop.create_window(attrs).unwrap());

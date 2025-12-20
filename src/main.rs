@@ -1,4 +1,6 @@
-use std::sync::Arc;
+#![windows_subsystem = "windows"]
+
+use std::{ffi::CString, num::NonZeroIsize, sync::Arc};
 
 use anyhow::{Context, Result};
 use nalgebra::Vector2;
@@ -9,9 +11,10 @@ use wgpu::{
 };
 use winit::{
     application::ApplicationHandler,
+    dpi::{PhysicalPosition, PhysicalSize},
     event::WindowEvent,
     event_loop::{ActiveEventLoop, EventLoop},
-    window::{Window, WindowAttributes, WindowId},
+    window::{Fullscreen, Window, WindowAttributes, WindowId},
 };
 
 use macintosh_wallpaper::{
@@ -27,8 +30,10 @@ struct Application {
 struct State {
     window: Arc<Window>,
     surface: Surface<'static>,
-
     renderer: Renderer,
+
+    cursor_start: Option<PhysicalPosition<f64>>,
+    preview: bool,
 }
 
 fn main() -> Result<()> {
@@ -59,9 +64,35 @@ impl ApplicationHandler for Application {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
         let config = include_bytes!("../animation/animation.bin");
         let animation = Animation::load(config).unwrap().runtime_from_args();
+        let rt = &animation.runtime;
 
-        let attrs = WindowAttributes::default().with_title("Macintosh Wallpaper");
+        #[cfg(windows)]
+        if rt.configure {
+            message_box("This screensaver has no configuration options.");
+            event_loop.exit();
+            return;
+        }
+
+        let preview = rt.preview.is_some();
+        let mut attrs = WindowAttributes::default()
+            .with_fullscreen(rt.full_screen.then_some(Fullscreen::Borderless(None)))
+            .with_title("Macintosh Wallpaper")
+            .with_visible(false);
+
+        #[cfg(windows)]
+        if let Some(hwnd) = rt.preview {
+            let parent = wgpu::rwh::Win32WindowHandle::new(NonZeroIsize::new(hwnd).unwrap());
+            unsafe {
+                attrs = attrs
+                    .with_inner_size(PhysicalSize::new(152, 112))
+                    .with_decorations(false)
+                    .with_parent_window(Some(parent.into()))
+            }
+        }
+
         let window = Arc::new(event_loop.create_window(attrs).unwrap());
+        window.set_cursor_visible(!rt.full_screen);
+        window.set_visible(true);
 
         let surface = self.gpu.instance.create_surface(window.clone()).unwrap();
         let renderer = Renderer::new(&self.gpu, animation);
@@ -69,6 +100,9 @@ impl ApplicationHandler for Application {
             surface,
             window,
             renderer,
+
+            cursor_start: None,
+            preview,
         });
     }
 
@@ -83,20 +117,26 @@ impl ApplicationHandler for Application {
             return;
         }
 
+        let full_screen = state.window.fullscreen().is_some();
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(_size) => self.resize_surface(),
+            WindowEvent::CursorMoved { position, .. } if !state.preview && full_screen => {
+                match state.cursor_start {
+                    Some(start) if start != position => {
+                        state.window.set_visible(false);
+                        event_loop.exit()
+                    }
+                    None => state.cursor_start = Some(position),
+                    _ => {}
+                }
+            }
             WindowEvent::RedrawRequested => {
                 let output = state.surface.get_current_texture().unwrap();
 
-                let mut encoder = self
-                    .gpu
-                    .device
-                    .create_command_encoder(&CommandEncoderDescriptor::default());
-
-                let view = output
-                    .texture
-                    .create_view(&TextureViewDescriptor::default());
+                let mut encoder =
+                    (self.gpu.device).create_command_encoder(&CommandEncoderDescriptor::default());
+                let view = (output.texture).create_view(&TextureViewDescriptor::default());
 
                 {
                     let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
@@ -144,5 +184,26 @@ impl Application {
             desired_maximum_frame_latency: 2,
         };
         state.surface.configure(&self.gpu.device, &config);
+    }
+}
+
+#[cfg(windows)]
+#[link(name = "user32")]
+unsafe extern "C" {
+    fn ShellMessageBoxA(
+        app: isize,
+        hwnd: isize,
+        caption: *const i8,
+        title: *const i8,
+        u_type: u32,
+    ) -> i32;
+}
+
+#[cfg(windows)]
+fn message_box(message: impl Into<Vec<u8>>) {
+    unsafe {
+        let title = CString::new("Macintosh Screensaver").unwrap();
+        let caption = CString::new(message.into()).unwrap();
+        ShellMessageBoxA(0, 0, caption.as_ptr(), title.as_ptr(), 0);
     }
 }

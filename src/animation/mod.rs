@@ -1,4 +1,5 @@
 use std::{
+    env,
     fs::{self, File},
     path::Path,
 };
@@ -38,6 +39,7 @@ pub struct Animation {
 }
 
 #[derive(Parser, Default)]
+#[cfg_attr(windows, command(ignore_errors = true))]
 pub struct RuntimeConfig {
     #[arg(long, default_value_t = 0.0)]
     pub fade_duration: f32,
@@ -45,6 +47,12 @@ pub struct RuntimeConfig {
     pub fade_in: bool,
     #[arg(long)]
     pub fade_out: Option<f32>,
+    #[arg(long, alias = "s")]
+    pub full_screen: bool,
+    #[arg(long, alias = "p")]
+    pub preview: Option<isize>,
+    #[arg(long, alias = "c", hide = true)]
+    pub configure: bool,
 }
 
 #[derive(Default)]
@@ -131,8 +139,20 @@ impl Animation {
     }
 
     pub fn runtime_from_args(self) -> Self {
+        let args = env::args().flat_map(|x| {
+            if let Some(arg) = x.strip_prefix('/') {
+                if let Some((key, value)) = arg.split_once(':') {
+                    vec![format!("--{key}"), value.to_string()]
+                } else {
+                    vec![format!("--{arg}")]
+                }
+            } else {
+                vec![x]
+            }
+        });
+
         Self {
-            runtime: RuntimeConfig::parse(),
+            runtime: RuntimeConfig::parse_from(args),
             ..self
         }
     }

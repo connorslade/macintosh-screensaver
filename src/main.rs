@@ -1,17 +1,17 @@
 #![windows_subsystem = "windows"]
 
-use std::{ffi::CString, num::NonZeroIsize, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use nalgebra::Vector2;
 use wgpu::{
-    Color, CommandEncoderDescriptor, Instance, LoadOp, Operations, RenderPassColorAttachment,
-    RenderPassDescriptor, RequestAdapterOptions, StoreOp, Surface, SurfaceConfiguration,
-    TextureFormat, TextureUsages, TextureViewDescriptor,
+    Color, CommandEncoderDescriptor, CompositeAlphaMode, Instance, LoadOp, Operations, PresentMode,
+    RenderPassColorAttachment, RenderPassDescriptor, RequestAdapterOptions, StoreOp, Surface,
+    SurfaceConfiguration, TextureFormat, TextureUsages, TextureViewDescriptor,
 };
 use winit::{
     application::ApplicationHandler,
-    dpi::{PhysicalPosition, PhysicalSize},
+    dpi::PhysicalPosition,
     event::WindowEvent,
     event_loop::{ActiveEventLoop, EventLoop},
     window::{Fullscreen, Window, WindowAttributes, WindowId},
@@ -65,6 +65,7 @@ impl ApplicationHandler for Application {
         let config = include_bytes!("../animation/animation.bin");
         let animation = Animation::load(config).unwrap().runtime_from_args();
         let rt = &animation.runtime;
+        let preview = rt.preview.is_some();
 
         #[cfg(windows)]
         if rt.configure {
@@ -73,7 +74,7 @@ impl ApplicationHandler for Application {
             return;
         }
 
-        let preview = rt.preview.is_some();
+        #[allow(unused_mut)]
         let mut attrs = WindowAttributes::default()
             .with_fullscreen(rt.full_screen.then_some(Fullscreen::Borderless(None)))
             .with_title("Macintosh Wallpaper")
@@ -81,12 +82,13 @@ impl ApplicationHandler for Application {
 
         #[cfg(windows)]
         if let Some(hwnd) = rt.preview {
-            let parent = wgpu::rwh::Win32WindowHandle::new(NonZeroIsize::new(hwnd).unwrap());
+            use ::{wgpu::rwh::Win32WindowHandle, winit::dpi::PhysicalSize};
+            let parent = Win32WindowHandle::new(NonZeroIsize::new(hwnd).unwrap());
             unsafe {
                 attrs = attrs
                     .with_inner_size(PhysicalSize::new(152, 112))
-                    .with_decorations(false)
                     .with_parent_window(Some(parent.into()))
+                    .with_decorations(false)
             }
         }
 
@@ -178,8 +180,8 @@ impl Application {
             format: self.gpu.texture_format,
             width: size.width,
             height: size.height,
-            present_mode: wgpu::PresentMode::AutoVsync,
-            alpha_mode: wgpu::CompositeAlphaMode::Auto,
+            present_mode: PresentMode::AutoVsync,
+            alpha_mode: CompositeAlphaMode::Auto,
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
         };
@@ -201,6 +203,8 @@ unsafe extern "C" {
 
 #[cfg(windows)]
 fn message_box(message: impl Into<Vec<u8>>) {
+    use std::{ffi::CString, num::NonZeroIsize};
+
     unsafe {
         let title = CString::new("Macintosh Screensaver").unwrap();
         let caption = CString::new(message.into()).unwrap();

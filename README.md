@@ -7,6 +7,27 @@ My attempt at a cross-platform recreation of the MacOS Sequoia ["Macintosh" scre
 The screensaver is available as a regular windowed application through the binary of the main crate, or as a wayland client supporting the layer-shell extension.
 The layer shell version can be used as a lock screen on sway with [swaylock-plugin](https://github.com/mstoeckl/swaylock-plugin).
 
+## Usage
+
+After cloning the repository, just build with cargo.
+
+```bash
+git clone https://github.com/connorslade/macintosh-screensaver
+cd macintosh-screensaver
+cargo b -r
+```
+
+On Windows, rename the resulting `.exe` file to `.scr` and move it to your System32 folder.
+Then just find and select `macintosh_screensaver` in the screensaver settings menu.
+
+If you want to use as a lock screen on sway, first install `swaylock-plugin`, then run the following commands.
+
+```bash
+# might be a good idea to rename the output to macintosh-screensaver-layer or smth
+cargo b -r -p wayland
+swaylock-plugin --command path/to/macintosh-screensaver-layer
+```
+
 ## Configuration
 
 By default the default configuration bundled into the executables will be used.
@@ -22,24 +43,6 @@ animation.export("animation/animation.bin").unwrap();
 
 After running (`cargo r -r`) this will replace `animation.bin` with a new version built from your config.
 Now remove the new code and after recompiling again, the new animation config will be packaged.
-
-## Usage
-
-After cloning the repository, just build with cargo.
-
-```bash
-git clone https://github.com/connorslade/macintosh-screensaver
-cd macintosh-screensaver
-cargo b -r
-```
-
-If you want to use as a lock screen on sway, first install `swaylock-plugin`, then run the following commands.
-
-```bash
-# might be a good idea to rename the output to macintosh-screensaver-layer or smth
-cargo b -r -p wayland
-swaylock-plugin --command path/to/macintosh-screensaver-layer
-```
 
 ## Todo
 
@@ -57,6 +60,8 @@ swaylock-plugin --command path/to/macintosh-screensaver-layer
 <details>
 <summary><a href="https://infinitemac.org">Infinite Mac</a> Screen Recorder</summary>
 
+I was going to modify a mac emulator to output a png for every frame or something but the source code was just so gross I just decided to just save the canvas contents from an online emulator.
+
 ```js
 function imageDiff(a, b) {
   if (a.width != b.width || a.height != b.height) return true;
@@ -68,8 +73,8 @@ function imageDiff(a, b) {
 }
 
 setTimeout(() => {
-  console.log('start');
-  let ctx = document.querySelector('canvas').getContext('2d');
+  console.log("start");
+  let ctx = document.querySelector("canvas").getContext("2d");
   let write = ctx.putImageData.bind(ctx);
 
   window.concat = [];
@@ -84,20 +89,20 @@ setTimeout(() => {
         let i = 0;
         for (image of window.concat) {
           i += 1;
-          let canvas = document.createElement('canvas');
+          let canvas = document.createElement("canvas");
           canvas.width = image.width;
           canvas.height = image.height;
-          let ctx = canvas.getContext('2d');
+          let ctx = canvas.getContext("2d");
           ctx.putImageData(image, 0, 0);
 
           canvas.toBlob((blob) => {
-            let link = document.createElement('a');
+            let link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
             link.download = `frame-${i}.png`;
 
             link.click();
             URL.revokeObjectURL(link.href);
-          }, 'image/png');
+          }, "image/png");
         }
 
         window.concat = null;
@@ -105,7 +110,7 @@ setTimeout(() => {
 
       write(image, x, y);
     }
-  }
+  };
 }, 2000);
 ```
 

@@ -61,7 +61,7 @@ fn main() -> Result<()> {
 }
 
 impl ApplicationHandler for Application {
-    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let config = include_bytes!("../animation/animation.bin");
         let animation = Animation::load(config).unwrap().runtime_from_args();
         let rt = &animation.runtime;
@@ -83,6 +83,8 @@ impl ApplicationHandler for Application {
         #[cfg(windows)]
         if let Some(hwnd) = rt.preview {
             use ::{wgpu::rwh::Win32WindowHandle, winit::dpi::PhysicalSize};
+            use std::num::NonZeroIsize;
+
             let parent = Win32WindowHandle::new(NonZeroIsize::new(hwnd).unwrap());
             unsafe {
                 attrs = attrs
@@ -203,7 +205,7 @@ unsafe extern "C" {
 
 #[cfg(windows)]
 fn message_box(message: impl Into<Vec<u8>>) {
-    use std::{ffi::CString, num::NonZeroIsize};
+    use std::ffi::CString;
 
     unsafe {
         let title = CString::new("Macintosh Screensaver").unwrap();
